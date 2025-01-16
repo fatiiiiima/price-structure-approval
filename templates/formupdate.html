@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Price Process</title>
+    <!-- Link Bootstrap CSS -->
+    <link
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .display-values {
+        display: flex;
+        flex-direction: row;
+        gap: 2px;
+      }
+    </style>
+    <script>
+      async function fetchSKUInfo(event) {
+        event.preventDefault(); // Prevent form submission
+
+        const skuNumber = document.getElementById("skuSelect").value;
+        console.log("this is the sku", skuNumber);
+        const country = document.getElementById("countrySelect").value;
+        console.log("this is the country", country);
+
+        // Send request to backend
+        const response = await fetch("/get_sku_info", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ sku_number: skuNumber, country: country }),
+        });
+
+        const data = await response.json();
+        console.log("this is the response", data);
+
+        if (data.tts) {
+          console.log("TTS%:", data.tts);
+        }
+        if (data.total_cogs) {
+          console.log("Total COGS:", data.total_cogs_usd);
+        }
+        if (data.pcs_per_case) {
+          console.log("PCS per case", data.pcs_per_case);
+        }
+
+        if (data.currency_rate) {
+          console.log("currency rate", data.currency_rate);
+        }
+
+        if (data.total_cogs_local) {
+          console.log("local currency", data.total_cogs_local);
+        }
+
+        // Update the display section
+        const displaySection = document.getElementById("skuInfo");
+        if (response.ok) {
+          displaySection.innerHTML = `
+          <h3>SKU Details:</h3>
+          <p><strong>Description:</strong> ${data.description}</p>
+          <p><strong>Brand:</strong> ${data.brand}</p>
+          <p><strong>Sector:</strong> ${data.sector}</p>
+          <p><strong>Flavor:</strong> ${data.flavor}</p>
+          <p><strong>Format:</strong> ${data.format}</p>
+          <p><strong>Packing:</strong> ${data.packing}</p>
+          <p><strong>Project:</strong> ${data.project}</p>
+          <p><strong>Type:</strong> ${data.type}</p>
+         <div class="display-values">
+          <p><strong>VAT:</strong></p>
+          <p id="vat"> ${data.vat}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>RM:</strong></p>
+          <p id="rm"> ${data.rm}</p>
+          </div>
+          
+          <div class="display-values">
+          <p><strong>WSM:</strong></p>
+          <p id="wsm"> ${data.wsm}</p>
+          </div>
+
+          <div class="display-values">
+          <p><strong>DM:</strong></p>
+          <p id="dm"> ${data.dm}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>Duty:</strong></p>
+          <p id="duty"> ${data.duty}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>Clearing Charges:</strong></p>
+          <p id="cc"> ${data.cc}</p>
+          </div>
+
+          <div class="display-values">
+          <p><strong>Bad and Damages:</strong></p>
+          <p id="bd"> ${data.bd}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>CPP:</strong></p>
+          <p id="cpp"> ${data.cpp}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>RSP including VAT (per piece):</strong></p>
+          <p id="rsp"> ${data.rsp}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>BPTT (per case):</strong></p>
+          <p id="bptt"> ${data.bptt}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>CIF (per case):</strong></p>
+          <p id="cif"> ${data.cif}</p>
+          </div>
+          <p><strong>Pieces per case :</strong></p>
+          <p id="pcs"> ${data.pcs_per_case}</p>
+          </div>
+          <p><strong>Case per ton :</strong></p>
+          <p id="case_per_ton"> ${data.case_per_ton}</p>
+          </div>
+          <p><strong>Total cogs per ton(in USD)</strong></p>
+          <p id="cogs_usd"> ${data.total_cogs_usd}</p>
+          </div>
+          <p><strong>Total cogs per ton (in local currency)</strong></p>
+          <p id="cogs_local"> ${data.total_cogs_local}</p>
+          </div>
+          <p><strong>Total cogs per case (in local currency)</strong></p>
+          <p id="cogs_local_case"> ${data.cogs_per_case}</p>
+          </div>
+          <p><strong>TTS%</strong></p>
+          <p id="tts"> ${data.tts}</p>
+          </div>
+          <div class="form-group">
+           <label for="newRSP">New RSP</label>
+             <input 
+              type="text" 
+              class="form-control" 
+              id="newRSP" 
+              placeholder="New RSP">
+            <label for="newTTS">New TTS</label>
+             <input 
+              type="text" 
+              class="form-control" 
+              id="newTTS" 
+              placeholder="New TTS (in %)">
+            <button type="submit" class="btn btn-primary"onclick="calculate_values()">Calculate</button>
+          </div> 
+        `;
+        } else {
+          displaySection.innerHTML = `<p style="color: red;">${data.error}</p>`;
+        }
+      }
+
+      function removePercentageSign(value) {
+        if (typeof value === "string") {
+          // Remove the '%' sign and trim any whitespace
+          const numericValue = value.replace("%", "").trim();
+
+          // Convert to a decimal if the result is a valid number
+          const decimalValue = parseFloat(numericValue);
+          return isNaN(decimalValue) ? 0 : decimalValue / 100;
+        }
+        return 0; // Default to 0 for non-string or invalid inputs
+      }
+
+      async function calculate_values() {
+        const newRSP = document.getElementById("newRSP").value;
+        console.log(newRSP);
+
+        const newTTS = document.getElementById("newTTS").value;
+        console.log("this is the new tts %", newTTS);
+
+        const cogs_local_per_case =
+          document.getElementById("cogs_local_case").innerText;
+        console.log("this is the local cogs per case", cogs_local_per_case);
+        const pcs = document.getElementById("pcs").innerText;
+        console.log("this is the pcs", pcs);
+        const vat = document.getElementById("vat").innerText;
+        console.log(vat);
+        const newVat = removePercentageSign(vat);
+        console.log(newVat);
+        const rm = document.getElementById("rm").innerText;
+        console.log(rm);
+        const newRM = removePercentageSign(rm);
+        console.log(newRM);
+        const wsm = document.getElementById("wsm").innerText;
+        console.log(wsm);
+        const newWSM = removePercentageSign(wsm);
+        console.log(newWSM);
+        const dm = document.getElementById("dm").innerText;
+        console.log(dm);
+        const newDM = removePercentageSign(dm);
+        console.log(newDM);
+        const duty = document.getElementById("duty").innerText;
+        console.log(duty);
+        const newDuty = removePercentageSign(duty);
+        console.log(newDuty);
+        const cc = document.getElementById("cc").innerText;
+        console.log(cc);
+        const newCC = removePercentageSign(cc);
+        console.log(newCC);
+        const bd = document.getElementById("bd").innerText;
+        console.log(bd);
+        const newBD = removePercentageSign(bd);
+        console.log(newBD);
+        const cpp = document.getElementById("cpp").innerText;
+        console.log(cpp);
+        const newCPP = removePercentageSign(cpp);
+        console.log(newCPP);
+
+        const response = await fetch("/calculate_results", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            newRSP,
+            newVat,
+            newRM,
+            newWSM,
+            newDM,
+            newDuty,
+            newCC,
+            newBD,
+            newCPP,
+            pcs,
+            newTTS,
+            cogs_local_per_case,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Display calculated values
+          document.getElementById("skuInfo").innerHTML += `
+      <h3>Calculated Values:</h3>
+  <div class="display-values">
+    <p><strong>New BPTT (per case level):</strong></p>
+        <p id="new_bptt"> ${data.newBPTT.toFixed(2)}</p>
+  </div>
+      
+  <div class="display-values">
+    <p><strong>New CIF (per case level):</strong></p>
+      <p id="new_cif"> ${data.newCIF.toFixed(2)}</p>
+  </div>
+
+
+    <div class="display-values">
+     <p><strong>RSP (per piece level):</strong></p>
+          <p id="new_rsp"> ${data.newRSP.toFixed(2)}</p>
+    </div>
+
+  <div class="display-values">
+    <p><strong>GSV:</strong></p>
+       <p id="gsv"> ${data.newGSV.toFixed(2)}</p>
+  </div>
+
+
+  <div class="display-values">
+    <p><strong>Cogs per case:</strong></p>
+        <p id="new_cogs"> ${data.cogs.toFixed(2)}</p>
+  </div>
+
+  <div class="display-values">
+    <p><strong>TTS %:</strong></p>
+      <p id="new_tts_percentage"> ${data.tts_percentage.toFixed(2)}</p>
+  </div>
+  
+  <div class="display-values">
+    <p><strong>TTS:</strong></p>
+      <p id="new_tts"> ${data.tts.toFixed(2)}</p>
+  </div>
+        
+  <div class="display-values">
+    <p><strong>TO:</strong></p>
+      <p id="to"> ${data.to.toFixed(2)}</p>
+  </div>
+
+  <div class="display-values">
+    <p><strong>GP:</strong></p>
+     <p id="gp"> ${data.gp.toFixed(2)}</p>
+  </div>
+
+        
+
+  <div class="display-values">
+    <p><strong>Gross Margin:</strong></p>
+      <p id="gm"> ${data.gm.toFixed(2)}</p>
+  </div>
+
+
+
+      <button type="submit" class="btn btn-primary" onClick="submitRequest()">Submit for Approval</button>
+    `;
+        } else {
+          console.error("Error in calculation:", data.error);
+        }
+      }
+
+      async function submitRequest() {
+        // Collect data from calculated values or other inputs
+        const skuCode = document.getElementById("skuSelect").value;
+        const country = document.getElementById("countrySelect").value;
+        const newBPTT = document.getElementById("new_bptt").innerText;
+        const newCIF = document.getElementById("new_cif").innerText;
+        const newRSP = document.getElementById("new_rsp").innerText;
+        console.log("new rsp", newRSP)
+        const newGSV = document.getElementById("gsv").innerText;
+        const tts = document.getElementById("new_tts_percentage").innerText;
+        console.log("new tts", tts)
+        const to = document.getElementById("to").innerText;
+        const gp = document.getElementById("gp").innerText;
+        const gm = document.getElementById("gm").innerText;
+        const cogs_new = document.getElementById("new_cogs").innerText;
+        console.log("cogs", cogs_new)
+        
+        console.log({
+          sku_code: skuCode,
+          country: country,
+          bptt: newBPTT,
+          cif: newCIF,
+          new_rsp: newRSP,
+          gsv: newGSV,
+          new_tts: tts,
+          to: to,
+          gp: gp,
+          gm: gm,
+          cogs: cogs_new,
+        });
+
+        try {
+          const response = await fetch("/submit_request", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              sku_code: skuCode,
+              country: country,
+              bptt: newBPTT,
+              cif: newCIF,
+              new_rsp: newRSP,
+              gsv: newGSV,
+              new_tts: tts,
+              to: to,
+              gp: gp,
+              gm: gm,
+              cogs: cogs_new,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            alert("Request submitted successfully!");
+          } else {
+            alert(`Error: ${data.error}`);
+          }
+        } catch (error) {
+          console.error("Error submitting request:", error);
+          alert("Failed to submit request. Please try again.");
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h1>Price Structure</h1>
+      <form onsubmit="fetchSKUInfo(event)">
+        <div class="form-group">
+          <label for="skuSelect">SKU Number</label>
+          <select id="skuSelect">
+            <option value="">Loading SKUs...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="countrySelect">Country</label>
+          <select class="form-control" id="countrySelect">
+            <option value="KSA">KSA</option>
+            <option value="UAE">UAE</option>
+            <option value="Kuwait">Kuwait</option>
+            <option value="Qatar">Qatar</option>
+            <option value="Oman">Oman</option>
+            <option value="Bahrain">Bahrain</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </form>
+      <div id="skuInfo" class="mt-4">
+        <!-- Dynamic SKU info will appear here -->
+      </div>
+      <div>
+        <a href="/logout">Logout</a>
+      </div>
+      <div>
+        <a href="{{ url_for('view_requests') }}">View your Requests</a>
+      </div>
+    </div>
+    <script>
+      // Function to populate the SKU dropdown
+      async function loadSKUs() {
+        const skuSelect = document.getElementById("skuSelect");
+
+        try {
+          const response = await fetch("/get_skus"); // Call the backend route
+          const data = await response.json();
+
+          if (response.ok) {
+            // Clear existing options
+            skuSelect.innerHTML = '<option value="">Select SKU</option>';
+
+            // Add options dynamically
+            data.skus.forEach((sku) => {
+              const option = document.createElement("option");
+              option.value = sku;
+              option.textContent = sku;
+              skuSelect.appendChild(option);
+            });
+          } else {
+            console.error("Failed to fetch SKUs:", data.error);
+          }
+        } catch (error) {
+          console.error("Error fetching SKUs:", error);
+        }
+      }
+
+      // Load SKUs when the page loads
+      window.onload = loadSKUs;
+    </script>
+  </body>
+</html>

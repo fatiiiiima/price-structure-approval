@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Update Tables</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        padding: 0;
+        background-color: #f4f4f4;
+      }
+
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+
+      .button-container {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+
+      .form-container {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        max-width: 400px;
+        width: 90%;
+      }
+
+      .form-container h2 {
+        margin-top: 0;
+      }
+
+      .form-container label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+
+      .form-container select,
+      .form-container input,
+      .form-container button {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+
+      .form-container button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+      }
+
+      .form-container button:hover {
+        background-color: #0056b3;
+      }
+
+      .close-button {
+        background-color: #ff4d4d;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 5px;
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        transition: background-color 0.3s;
+      }
+
+      .close-button:hover {
+        background-color: #cc0000;
+      }
+
+      .alert {
+        text-align: center;
+        margin-top: 20px;
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Update Tables</h1>
+
+    <div class="button-container">
+      <button id="update-currency-button">Update Currency Rates</button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-button">
+        Upload SKU Master 1 File with TTS%
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-cogs-button">Upload COGS Master File</button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-master-button">Upload Master 3 File</button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-cd-button">Upload CD Manager File</button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-qatar-button">
+        Upload Qatar Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-ksa-button">
+        Upload KSA Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-bahrain-button">
+        Upload Bahrain Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-uae-button">
+        Upload UAE Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-kuwait-button">
+        Upload Kuwait Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="upload-excel-oman-button">
+        Upload Oman Price Structure File
+      </button>
+    </div>
+
+    <!-- <a href="{{ url_for('back_admin_dashboard') }}">Dashboard</a> -->
+
+    <div class="button-container">
+      <button id="back-button">
+        Back to Dashboard
+      </button>
+    </div>
+
+    <div class="form-container" id="currency-form-container">
+      <button id="close-currency-form">X</button>
+      <h2>Update Currency Rates</h2>
+      <form id="update-currency-form">
+        <label for="country">Select Country:</label>
+        <select id="country" name="country" required>
+          <option value="" disabled selected>Select a country</option>
+          <option value="KSA">KSA</option>
+          <option value="UAE">UAE</option>
+          <option value="OMAN">Oman</option>
+          <option value="Bahrain">Bahrain</option>
+          <option value="Qatar">Qatar</option>
+          <option value="Kuwait">Kuwait</option>
+        </select>
+
+        <label for="toUSD">Enter New Conversion Rate (To USD):</label>
+        <input
+          type="number"
+          id="toUSD"
+          name="toUSD"
+          step="0.0001"
+          placeholder="Enter rate (e.g., 3.75)"
+          required
+        />
+
+        <button type="submit">Update Currency</button>
+      </form>
+    </div>
+
+    <div id="alert-container" class="alert"></div>
+
+    <script>
+      const updateCurrencyButton = document.getElementById(
+        "update-currency-button"
+      );
+      const currencyFormContainer = document.getElementById(
+        "currency-form-container"
+      );
+      const closeCurrencyFormButton = document.getElementById(
+        "close-currency-form"
+      );
+      const updateCurrencyForm = document.getElementById(
+        "update-currency-form"
+      );
+      const alertContainer = document.getElementById("alert-container");
+
+      const uploadExcelButton = document.getElementById("upload-excel-button");
+
+      uploadExcelButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelCOGSButton = document.getElementById(
+        "upload-excel-cogs-button"
+      );
+
+      uploadExcelCOGSButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_cogs_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelMasterButton = document.getElementById(
+        "upload-excel-master-button"
+      );
+
+      uploadExcelMasterButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_master_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelQatarButton = document.getElementById(
+        "upload-excel-qatar-button"
+      );
+
+      uploadExcelQatarButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_qatar_ps_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelKSAButton = document.getElementById(
+        "upload-excel-ksa-button"
+      );
+
+      uploadExcelKSAButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_ksa_ps_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelBahrainButton = document.getElementById(
+        "upload-excel-bahrain-button"
+      );
+
+      uploadExcelBahrainButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_bahrain_ps_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelUAEButton = document.getElementById(
+        "upload-excel-uae-button"
+      );
+
+      uploadExcelUAEButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_uae_ps_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelKuwaitButton = document.getElementById(
+        "upload-excel-kuwait-button"
+      );
+
+      uploadExcelKuwaitButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_kuwait_ps_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadExcelOmanButton = document.getElementById(
+        "upload-excel-oman-button"
+      );
+
+      uploadExcelOmanButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_oman_ps_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      // Show the form when the button is clicked
+      updateCurrencyButton.addEventListener("click", () => {
+        currencyFormContainer.style.display = "block";
+      });
+
+      // Hide the form when the close button is clicked
+      closeCurrencyFormButton.addEventListener("click", () => {
+        currencyFormContainer.style.display = "none";
+        alertContainer.textContent = ""; // Clear any alerts
+      });
+
+      // Handle form submission
+      updateCurrencyForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(updateCurrencyForm);
+        const country = formData.get("country");
+        const toUSD = formData.get("toUSD");
+
+        fetch("/update_currency", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ country, toUSD }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            alertContainer.textContent = result.message || result.error;
+            alertContainer.style.color = result.message ? "green" : "red";
+
+            if (result.message) {
+              updateCurrencyForm.reset();
+              currencyFormContainer.style.display = "none"; // Close the form on success
+            }
+          })
+          .catch((error) => {
+            console.error("Error updating currency:", error);
+            alertContainer.textContent = "An error occurred. Please try again.";
+            alertContainer.style.color = "red";
+          });
+      });
+
+      const uploadExcelCDButton = document.getElementById(
+        "upload-excel-cd-button"
+      );
+
+      uploadExcelCDButton.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".xlsx, .xls";
+        fileInput.required = true;
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/upload_cd_excel", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((result) => {
+                alert(result.message || result.error);
+              })
+              .catch((error) => {
+                console.error("Error uploading Excel file:", error);
+                alert("An error occurred. Please try again.");
+              });
+          }
+        });
+
+        fileInput.click();
+      });
+
+      const uploadBackButton = document.getElementById(
+        "back-button"
+      );
+
+      uploadBackButton.addEventListener("click", () => {
+        window.location.href = "dashboard";
+      });
+
+    </script>
+  </body>
+</html>

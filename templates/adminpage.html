@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        padding: 0;
+        background-color: #f4f4f4;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      .options {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .options button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+      }
+
+      .options button:hover {
+        background-color: #0056b3;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: #fff;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: none;
+      }
+
+      th,
+      td {
+        padding: 10px;
+        text-align: left;
+        border: 1px solid #ddd;
+      }
+
+      th {
+        background-color: #f8f9fa;
+      }
+
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+
+      tr:hover {
+        background-color: #f1f1f1;
+      }
+
+      .form-container {
+        display: none;
+      }
+
+      .form-container form {
+        background-color: white;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        max-width: 400px;
+      }
+
+      .form-container form input,
+      .form-container form select,
+      .form-container form button {
+        display: block;
+        width: 90%;
+        margin-bottom: 15px;
+        padding: 10px;
+      }
+
+      .form-container form button {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+
+      .form-container form button:hover {
+        background-color: #218838;
+      }
+
+      .search-container {
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .search-container input {
+        width: 300px;
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .btn-action {
+        padding: 5px 10px;
+        font-size: 14px;
+        color: white;
+        background-color: #17a2b8;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        margin: 0 5px;
+      }
+
+      .btn-action:hover {
+        background-color: #138496;
+      }
+
+      .update_tables {
+        color: white;
+      }
+
+      .button-space {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Admin Dashboard</h1>
+    <div class="options">
+      <button id="view-requests">View All Requests</button>
+      <button id="create-user">Create New User</button>
+      <button id="export-requests">Export Requests to Excel</button>
+      <button id="update-tables">
+        <!-- <a class= "update_tables" href="{{ url_for('update_tables') }}">Update Tables</a> -->
+        Update Tables
+      </button>
+      <button id="forgot-password">Forgot Password?</button>
+      <a href="/logout" class="btn btn-secondary mt-3">Logout</a>
+    </div>
+    <div class="search-container">
+      <input
+        type="text"
+        id="search-bar"
+        placeholder="Search by SKU Code..."
+        onkeyup="filterTable()"
+      />
+    </div>
+    <table id="requests-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>SKU Code</th>
+          <th>Country</th>
+          <th>Requester Name</th>
+          <th>Approver Name</th>
+          <th>Status</th>
+          <th>RSP</th>
+          <th>TTS%</th>
+          <th>Gross Margin</th>
+          <th>Created At</th>
+          <th>Updated At</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- rows will be inserted dynamically -->
+      </tbody>
+    </table>
+
+    <div class="form-container" id="user-form">
+      <form id="create-user-form">
+        <h2>Create New User</h2>
+        <input type="text" name="name" placeholder="Name" required />
+        <input type="text" name="username" placeholder="Username" required />
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          required
+        />
+        <select name="role" required>
+          <option value="" disabled selected>Select Role</option>
+          <option value="finance">Finance</option>
+          <option value="cogsapprover">COGS Approver</option>
+          <option value="marketing">Marketing</option>
+          <option value="admin">Admin</option>
+          <option value="cdmanager">CD Manager</option>
+        </select>
+        <button type="submit">Create User</button>
+      </form>
+    </div>
+
+    <div class="form-container" id="forgot-form">
+      <form id="forgot-password-form">
+        <h2>Change Password</h2>
+        <input type="text" name="username" placeholder="Username" required />
+        <input
+          type="password"
+          name="new_password"
+          placeholder="New Password"
+          required
+        />
+        <button type="submit">Update Password</button>
+      </form>
+    </div>
+
+    <div class="form-container" id="delete-user-form-container">
+      <form id="delete-user-form">
+        <h2>Delete User</h2>
+        <input type="text" name="username" placeholder="Username" required />
+        <button type="submit">Delete User</button>
+      </form>
+    </div>
+
+    <script>
+      const viewRequestsButton = document.getElementById("view-requests");
+      const createUserButton = document.getElementById("create-user");
+      const requestsTable = document.getElementById("requests-table");
+      const userForm = document.getElementById("user-form");
+      const forgotPasswordButton = document.getElementById("forgot-password");
+      const forgotForm = document.getElementById("forgot-form");
+
+      const updateTablesButton = document.getElementById("update-tables");
+
+      // // Redirect to updatetables.html when the button is clicked
+      updateTablesButton.addEventListener("click", () => {
+        window.location.href = "updatetables";
+      });
+
+      // Event to show requests
+      viewRequestsButton.addEventListener("click", () => {
+        userForm.style.display = "none";
+        forgotForm.style.display = "none";
+        requestsTable.style.display = "table";
+        deleteUserFormContainer.style.display = "none";
+        // Fetch and populate the table
+        fetch("/all_requests", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            const tableBody = document.querySelector("#requests-table tbody");
+            tableBody.innerHTML = ""; // Clear existing rows
+            data.forEach((request) => {
+              const row = document.createElement("tr");
+              row.innerHTML = `
+            <td>${request.id}</td>
+            <td>${request.sku_code}</td>
+            <td>${request.country}</td>
+            <td>${request.requester_name}</td>
+            <td>${request.approver_name}</td>
+            <td><span class="badge ${
+              request.status === "Approved"
+                ? "badge-success"
+                : request.status === "Rejected"
+                ? "badge-danger"
+                : "badge-warning"
+            }">${request.status}</span></td>
+            <td>${request.rsp}</td>
+            <td>${request.tts_percentage}</td>
+            <td>${request.gm}</td>
+            <td>${new Date(request.created_at).toLocaleString()}</td>
+            <td>${new Date(request.updated_at).toLocaleString()}</td>
+            ${
+              request.status === "Request Approved"
+                ? `<td>
+                  <div class = 'button-space'>
+           <button class="btn-action" onclick="exportSAPTemplate('${request.unique_id}')">Export SAP</button>
+           <button class="btn-action" onclick="exportPDF('${request.unique_id}')">Export PDF</button>
+           </div>
+         </td>`
+                : "<td></td>"
+            }
+          `;
+              tableBody.appendChild(row);
+            });
+          });
+      });
+
+      // Event to show the form
+      createUserButton.addEventListener("click", () => {
+        requestsTable.style.display = "none";
+        forgotForm.style.display = "none";
+        userForm.style.display = "block";
+        deleteUserFormContainer.style.display = "none";
+      });
+
+      // Handle form submission
+      const createUserForm = document.getElementById("create-user-form");
+      createUserForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const formData = new FormData(createUserForm);
+        const userData = Object.fromEntries(formData);
+
+        fetch("/new_user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userData),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            alert(result.message || result.error);
+            if (result.message) {
+              createUserForm.reset();
+              userForm.style.display = "none";
+            }
+          })
+          .catch((error) => console.error("Error creating user:", error));
+      });
+
+      const exportRequestsButton = document.getElementById("export-requests");
+
+      exportRequestsButton.addEventListener("click", () => {
+        // Trigger the backend route to download the file
+        fetch("/export_requests", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Failed to export requests");
+            }
+            return response.blob(); // Get the file data as a blob
+          })
+          .then((blob) => {
+            // Create a link element, set the URL, and trigger the download
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "requests.xlsx"; // Set the download file name
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          })
+          .catch((error) => {
+            console.error("Error exporting requests:", error);
+            alert("Failed to export requests. Please try again later.");
+          });
+      });
+
+      forgotPasswordButton.addEventListener("click", () => {
+        requestsTable.style.display = "none";
+        forgotForm.style.display = "block";
+        userForm.style.display = "none";
+        deleteUserFormContainer.style.display = "none";
+      });
+
+      const forgotPasswordForm = document.getElementById(
+        "forgot-password-form"
+      );
+
+      forgotPasswordForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(forgotPasswordForm);
+        const userData = Object.fromEntries(formData);
+
+        fetch("/forgot_password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userData),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            alert(result.message || result.error);
+            if (result.message) {
+              forgotPasswordForm.reset();
+              forgotForm.style.display = "none";
+            }
+          })
+          .catch((error) => console.error("Error resetting password:", error));
+      });
+
+      const deleteUserButton = document.createElement("button");
+      deleteUserButton.textContent = "Delete User";
+      deleteUserButton.style.cssText = `
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+`;
+
+      deleteUserButton.addEventListener("mouseover", () => {
+        deleteUserButton.style.backgroundColor = "#bd2130";
+      });
+      deleteUserButton.addEventListener("mouseout", () => {
+        deleteUserButton.style.backgroundColor = "#dc3545";
+      });
+
+      // Append the button
+      document.querySelector(".options").appendChild(deleteUserButton);
+
+      // Reference to delete form
+      const deleteUserFormContainer = document.getElementById(
+        "delete-user-form-container"
+      );
+      const deleteUserForm = document.getElementById("delete-user-form");
+
+      // Show the delete user form when the button is clicked
+      deleteUserButton.addEventListener("click", () => {
+        requestsTable.style.display = "none";
+        userForm.style.display = "none";
+        forgotForm.style.display = "none";
+        deleteUserFormContainer.style.display = "block";
+      });
+
+      // Handle the delete user form submission
+      deleteUserForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(deleteUserForm);
+        const userData = Object.fromEntries(formData);
+
+        fetch("/delete_user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userData),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            alert(result.message || result.error);
+            if (result.message) {
+              deleteUserForm.reset();
+              deleteUserFormContainer.style.display = "none";
+            }
+          })
+          .catch((error) => console.error("Error deleting user:", error));
+      });
+
+      function filterTable() {
+        const searchInput = document
+          .getElementById("search-bar")
+          .value.toLowerCase();
+        const tableRows = document.querySelectorAll("#requests-table tbody tr");
+
+        tableRows.forEach((row) => {
+          const skuCode = row.cells[1].textContent.toLowerCase();
+          if (skuCode.includes(searchInput)) {
+            row.style.display = "";
+          } else {
+            row.style.display = "none";
+          }
+        });
+      }
+
+      function exportSAPTemplate(uniqueId) {
+        fetch(
+          `/export_sap_template?unique_id=${encodeURIComponent(uniqueId)}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Failed to export SAP template");
+            }
+            return response.blob(); // Get the file data as a blob
+          })
+          .then((blob) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `sap_template_${uniqueId}.xlsx`; // Set the download file name
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          })
+          .catch((error) => {
+            console.error("Error exporting SAP template:", error);
+            alert("Failed to export SAP template. Please try again.");
+          });
+      }
+      function exportPDF(uniqueId) {
+        fetch(`/export_pdf_file?unique_id=${encodeURIComponent(uniqueId)}`, {
+          method: "GET",
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Failed to export PDF");
+            }
+            return response.blob();
+          })
+          .then((blob) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `price_structure_${uniqueId}.pdf`; // Set the download file name
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          })
+          .catch((error) => {
+            console.error("Error exporting PDF:", error);
+            alert("Failed to export PDF. Please try again.");
+          });
+      }
+    </script>
+  </body>
+</html>

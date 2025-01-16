@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Approvals Dashboard</title>
+    <link
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .approval-card {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background-color: #f9f9f9;
+      }
+      .approval-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .approval-header h5 {
+        margin: 0;
+      }
+    </style>
+    <script>
+      // Function to load pending COGS approvals for Juanita
+      async function loadApprovals() {
+        const approvalsContainer =
+          document.getElementById("approvalsContainer");
+        approvalsContainer.innerHTML = "<p>Loading approvals...</p>";
+
+        try {
+          const response = await fetch("/pending_requests?approval_type=Approval"); // Filter by approval_type=COGS
+          const data = await response.json();
+
+          console.log("Approvals Data:", data);
+
+          if (data && data.length > 0) {
+            approvalsContainer.innerHTML = "";
+
+            data.forEach((approval) => {
+              const card = document.createElement("div");
+              card.className = "approval-card";
+
+              card.innerHTML = `
+                <div class="approval-header">
+                  <h5>${approval.sku_code} - ${approval.country}</h5>
+                  <span class="badge badge-info">${approval.status}</span>
+                </div>
+                <p><strong>Approval Type:</strong> ${approval.approval_type}</p>
+                <p><strong>Submitted By:</strong> ${approval.requester_name}</p>
+                <p><strong>Date:</strong> ${approval.created_at}</p>
+                <p><strong>New RSP:</strong> ${approval.rsp}</p>
+                <p><strong>New TTS:</strong> ${approval.tts_percentage}%</p>
+                <p><strong>COGS:</strong> ${approval.cogs}</p>
+                <p><strong>GM:</strong> ${approval.gm}</p>
+                <p><strong>GP:</strong> ${approval.gp}</p>
+                <p><strong>CIF (per case):</strong> ${approval.cif}</p>
+                <p><strong>BPTT (per case):</strong> ${approval.bptt}</p>
+
+                <button class="btn btn-success btn-sm" onclick="approveCOGS('${approval.id}')">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectRequest('${approval.id}')">Reject</button>
+              `;
+
+              approvalsContainer.appendChild(card);
+            });
+          } else {
+            approvalsContainer.innerHTML = "<p>No pending approvals.</p>";
+          }
+        } catch (error) {
+          console.error("Error fetching approvals:", error);
+          approvalsContainer.innerHTML =
+            "<p>Failed to load approvals. Please try again later.</p>";
+        }
+      }
+
+      // Function to approve a COGS request
+      async function approveCOGS(approvalId) {
+        if (confirm("Are you sure you want to approve this request?")) {
+          try {
+            const response = await fetch(`/approve_pre_final`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                request_id: approvalId,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              alert(`Failed to approve request: ${errorData.error}`);
+            } else {
+              alert("Request approved successfully.");
+              loadApprovals(); // Refresh the approvals list
+            }
+          } catch (error) {
+            console.error("Error approving request:", error);
+            alert("Failed to approve the request. Please try again later.");
+          }
+        }
+      }
+
+      // Function to reject a request
+      async function rejectRequest(approvalId) {
+        if (confirm("Are you sure you want to reject this request?")) {
+          try {
+            const response = await fetch(`/reject_pre_final`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                request_id: approvalId,
+              }),
+            });
+
+            if (response.ok) {
+              alert("Request rejected successfully.");
+              loadApprovals(); // Refresh the approvals list
+            } else {
+              const data = await response.json();
+              alert(`Failed to reject request: ${data.error}`);
+            }
+          } catch (error) {
+            console.error("Error rejecting request:", error);
+            alert("Failed to reject the request. Please try again later.");
+          }
+        }
+      }
+
+      // Load approvals when the page loads
+      window.onload = loadApprovals;
+    </script>
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h1>Approvals Dashboard</h1>
+      <div id="approvalsContainer" class="mt-4">
+        <!-- Pending approvals will appear here -->
+      </div>
+      <a href="/logout" class="btn btn-secondary mt-3">Logout</a>
+    </div>
+  </body>
+</html>
