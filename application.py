@@ -21,6 +21,7 @@ server = 'Factory'
 database = 'TestDB'
 
 app.secret_key = os.getenv('SECRET_KEY')
+conn_str = os.getenv('DB_CONN_STR')
 
 
 login_manager = LoginManager()
@@ -34,7 +35,6 @@ login_manager.login_view = "login"
 #     Trusted_Connection=yes;
 # """
 
-conn_str = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:price-structure.database.windows.net,1433;Database=TestDB;Uid=testdbadmin;Pwd=Admin@1234;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
 
 
 print(conn_str)
