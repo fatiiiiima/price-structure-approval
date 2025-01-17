@@ -193,7 +193,8 @@
         />
         <select name="role" required>
           <option value="" disabled selected>Select Role</option>
-          <option value="finance">Finance</option>
+          <option value="manager">Finance Manager</option>
+          <option value="ttsapprover">TTS Approver</option>
           <option value="cogsapprover">COGS Approver</option>
           <option value="marketing">Marketing</option>
           <option value="admin">Admin</option>
@@ -273,8 +274,8 @@
                 : "badge-warning"
             }">${request.status}</span></td>
             <td>${request.rsp}</td>
-            <td>${request.tts_percentage}</td>
-            <td>${request.gm}</td>
+            <td>${request.tts_percentage} %</td>
+            <td>${request.gm} %</td>
             <td>${new Date(request.created_at).toLocaleString()}</td>
             <td>${new Date(request.updated_at).toLocaleString()}</td>
             ${

@@ -27,12 +27,15 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
-conn_str = f"""
-    DRIVER={{SQL Server}};
-    SERVER={server};
-    DATABASE={database};
-    Trusted_Connection=yes;
-"""
+# conn_str = f"""
+#     DRIVER={{SQL Server}};
+#     SERVER={server};
+#     DATABASE={database};
+#     Trusted_Connection=yes;
+# """
+
+conn_str = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:price-structure.database.windows.net,1433;Database=TestDB;Uid=testdbadmin;Pwd=Admin@1234;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+
 
 print(conn_str)
 
@@ -96,7 +99,7 @@ def login():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    if current_user.role == 'finance':  # Check if the user is 'alsafadi'
+    if current_user.role == 'ttsapprover':  # Check if the user is 'alsafadi'
         return render_template('financepage.html')  # Render the specific page
     
     if current_user.role == 'cogsapprover':  # Check if the user is 'alsafadi'
@@ -384,7 +387,7 @@ def get_skus():
         cursor = conn.cursor()
 
         # Query the database for distinct SKU values
-        cursor.execute("SELECT DISTINCT SKU_Code FROM Master1")  # Adjust table/column names if needed
+        cursor.execute("SELECT DISTINCT [SKU Code] FROM SKU_tts")  # Adjust table/column names if needed
         skus = [row[0] for row in cursor.fetchall()]  # Fetch all SKUs into a list
 
         # Close the connection
@@ -510,7 +513,7 @@ def submit_request():
     cursor = conn.cursor()
 
     # Fetch approvers
-    cursor.execute("SELECT id, username FROM users WHERE role = 'finance'")
+    cursor.execute("SELECT id, username FROM users WHERE role = 'ttsapprover'")
     finance = cursor.fetchone()
 
     cursor.execute("SELECT id, username FROM users WHERE role = 'cogsapprover'")
@@ -556,7 +559,7 @@ def submit_request():
 @app.route('/approve_tts', methods=['POST'])
 @login_required
 def approve_tts():
-    if current_user.role != 'finance':
+    if current_user.role != 'ttsapprover':
         return "Unauthorized", 403
 
     data = request.get_json()
@@ -587,7 +590,7 @@ def approve_tts():
             SELECT id FROM users WHERE role = 'cogsapprover'
         ),
         approver_name = (
-            SELECT name FROM users WHERE role = 'finance'
+            SELECT name FROM users WHERE role = 'ttsapprover'
         ), 
         request_id = ?
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'TTS'
@@ -617,7 +620,7 @@ def approve_tts():
 @app.route('/reject_tts', methods=['POST'])
 @login_required
 def reject_tts():
-    if current_user.role != 'finance':
+    if current_user.role != 'ttsapprover':
         return "Unauthorized", 403
 
     data = request.get_json()
@@ -647,7 +650,7 @@ def reject_tts():
             next_approver_id = NULL,
             current_approver_id = NULL, 
             approver_name = (
-                SELECT name FROM users WHERE role = 'finance'
+                SELECT name FROM users WHERE role = 'ttsapprover'
             ), 
             request_id = ?
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'TTS'
@@ -923,7 +926,7 @@ def all_requests():
             "gsv": row[11],
             "too": row[12],
             "gp": row[13],
-            "gm": row[14],
+            "gm": row[14] * 100,
             "cogs": row[15],
             "requester_name": row[16],
             "created_at": row[17],
@@ -1249,42 +1252,42 @@ def final_approval():
             UPDATE [Qatar_PS_New]
             SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif)
+            """, bptt, cif, sku_code)
         
         elif country == 'Kuwait':
             cursor.execute("""
             UPDATE [Kuwait_PS_New]
             SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif)
+            """, bptt, cif, sku_code)
             
         elif country == 'KSA':
             cursor.execute("""
             UPDATE [KSA_PS_New]
             SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif)
+            """, bptt, cif, sku_code)
             
         elif country == 'UAE':
             cursor.execute("""
             UPDATE [UAE_PS_New]
             SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif)
+            """, bptt, cif, sku_code)
         
         elif country == 'Oman':
             cursor.execute("""
             UPDATE [Oman_PS_New]
             SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif)
+            """, bptt, cif, sku_code)
             
         elif country == 'Bahrain':
             cursor.execute("""
             UPDATE [Bahrain_PS_New]
             SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif)
+            """, bptt, cif, sku_code)
             
         
         
@@ -1544,16 +1547,32 @@ def export_pdf_file():
         """)
     finance_manager = cursor.fetchone()
     
-
+    formatted_date = updated_At.strftime("%Y-%m-%d")
+    
+    if country == 'Qatar':
+        currency = 'QAR'
+        
+    elif country in ['KSA', 'Oman', 'Bahrain', 'UAE']:
+        currency = 'USD'
+        
+    elif country == 'Kuwait':
+        currency = 'KWD'
+    
+    entity_int = int(entity)
+    entity_string = str(entity_int)
+    
+    full_string = entity_string + currency
+    full_string2 = entity_string + "Ekaterra Gulf FZE (Free zone entity)"
+    
     data = {
-        "date_of_communication": updated_At, 
+        "date_of_communication": formatted_date, 
         "distributor": "",
         "country": country, 
-        "effective_date_from": updated_At,
+        "effective_date_from": formatted_date,
         "effective_date_till": "Till next communication of Price update", 
-        "invoicing_currency": entity, 
-        "invoicing_entity": entity,
-        "finance_member": finance_manager[0],
+        "invoicing_currency": full_string  , 
+        "invoicing_entity": full_string2,
+        "finance_member": "Kunal Thakwani",
         "table_data": [
             [
                 entity, 
@@ -1647,7 +1666,7 @@ def delete_user():
             return jsonify({"error": "User not found"}), 404
 
         # Update the user's role to NULL
-        cursor.execute("UPDATE dbo.users SET role = 'Deleted' WHERE username = ?", username)
+        cursor.execute("UPDATE dbo.users SET username = 'null', role = 'Deleted' WHERE username = ?", username)
         conn.commit()
 
         return jsonify({"message": f"User '{username}' role has been deleted."}), 200
@@ -2563,7 +2582,7 @@ def upload_qatar_ps_excel():
                     [Proposed RSP (inc VAT) LC], [VAT %], [VAT], [Proposed RSP (ex VAT) LC], [RSP/Cs_LC], 
                     [RM %], [Retail Markup LC], [Retail Price LC], [WSM %], [W/Sale Markup LC], [BPTT LC/Case], [DM %], [Distributor Markup LC], 
                     [DPLC LC/case], [Duty %], [Duty], [Clearing Charges %], [Clearing Charges],
-                    [BD], [CIF LC/case], [CPP%], [CPP], [GSV LC/case], [BPTT $/Case], [CIF $/Case], [BPTT $/Ton], [CIF $/Ton], [GSV/Ton $], [BPTT  LC/Piece], [Check], [Z009], [Z521],                      [Z000]
+                    [BD], [CIF LC/case], [CPP%], [CPP], [GSV LC/case], [BPTT $/Case], [CIF $/Case], [BPTT $/Ton], [CIF $/Ton], [GSV/Ton $], [BPTT LC/Piece], [Check], [Z009], [Z521],                      [Z000]
                 ) VALUES (?, ?, ?, ?, ?, ?, ?,?,?,?,?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -2632,7 +2651,7 @@ def upload_bahrain_ps_excel():
             'DPLC LC/case', 'Duty %', 'Duty', 'Clearing Charges %', 'Clearing Charges', 
             'BD', 'CIF LC/case', 'CPP%', 'CPP', 'GSV LC/case', 'F43', 'Stock', 
             'Z521 SAP', 'F46', 'F47', 'BPTT $/Case', 'CIF $/Case', 'BPTT $/Ton', 
-            'CIF $/Ton', 'GSV/Ton $', 'BPTT  LC/Piece', 'Check', 'Z009', 'Z521', 
+            'CIF $/Ton', 'GSV/Ton $', 'BPTT LC/Piece', 'Check', 'Z009', 'Z521', 
             'Z000'
         ]
         
@@ -2667,7 +2686,7 @@ def upload_bahrain_ps_excel():
             'DPLC LC/case', 'Duty %', 'Duty', 'Clearing Charges %', 'Clearing Charges', 
             'BD', 'CIF LC/case', 'CPP%', 'CPP', 'GSV LC/case', 'F43', 'F46', 'F47', 
             'BPTT $/Case', 'CIF $/Case', 'BPTT $/Ton', 'CIF $/Ton', 'GSV/Ton $', 
-            'BPTT  LC/Piece', 'Check'
+            'BPTT LC/Piece', 'Check'
         ]
         
         for column in numeric_columns:
@@ -3185,7 +3204,7 @@ def upload_cd_excel():
         df = pd.read_excel(file)
         
         required_columns = [
-            'Country', 'VAT_Percentage', 'CD_Manager', 'DB_Contact'
+            'Country', 'VAT_Percentage', 'CD_Manager', 'DB_Manager'
         ]
         
         numeric_columns = [
@@ -3194,7 +3213,7 @@ def upload_cd_excel():
         for column in numeric_columns:
             df[column] = pd.to_numeric(df[column], errors='coerce').fillna(0)
             
-        categorical_columns = ['Country', 'CD_Manager', 'DB_Contact']
+        categorical_columns = ['Country', 'CD_Manager', 'DB_Manager']
         for column in categorical_columns:
             df[column] = df[column].astype(str)
         # Connect to SQL Server
@@ -3207,10 +3226,10 @@ def upload_cd_excel():
             cursor.execute(
                 """
                 INSERT INTO [CountryDetails] (
-                [Country], [VAT_Percentage], [CD_Manager], [DB_Contact]
+                [Country], [VAT_Percentage], [CD_Manager], [DB_Manager]
                 ) VALUES (?, ?, ?, ?)
                 """, 
-                row['Country'], float(row['VAT_Percentage']), row['CD_Manager'], row['DB_Contact']
+                row['Country'], float(row['VAT_Percentage']), row['CD_Manager'], row['DB_Manager']
             )
         
         conn.commit()

@@ -6,7 +6,7 @@ def hash_password(password):
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed.decode('utf-8')
 
-admin_password = "taha"  # Replace with the desired admin password
+admin_password = "PriceStructureAdmin@123"  # Replace with the desired admin password
 hashed_password = hash_password(admin_password)
 
 print("Hashed Password:", hashed_password)
