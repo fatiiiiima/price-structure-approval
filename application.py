@@ -37,7 +37,6 @@ login_manager.login_view = "login"
 
 
 
-print(conn_str)
 
 # User class for Flask-Login
 class User(UserMixin):
@@ -172,14 +171,14 @@ def get_sku_data(sku_number, country):
                 "packing": row[5],
                 "project": row[6],
                 "type": row[7],
-                "vat": row[8],
-                "rm": row[9],
-                "wsm": row[10],
-                "dm": row[11],
-                "duty": row[12],
-                "clearingcharges": row[13],
-                "bd": row[14],
-                "cpp": row[15],
+                "vat": round(row[8] * 100, 2),
+                "rm": round(row[9] *100, 2),
+                "wsm": round(row[10] * 100, 2),
+                "dm": round(row[11] * 100, 2),
+                "duty": round(row[12]* 100, 2),
+                "clearingcharges": round(row[13] * 100,2),
+                "bd": round(row[14] * 100, 2),
+                "cpp": round(row[15] * 100, 2),
             }
 
         #Additional query: Fetch TTS% from SKU_tts table
@@ -259,7 +258,7 @@ def get_sku_data(sku_number, country):
         if country == 'Qatar':
             query_qatar = """
             SELECT 
-                [Proposed RSP (inc VAT) LC], [BPTT LC/Case], [CIF LC/case]
+                [Proposed RSP (inc VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
             FROM Qatar_PS_New
             WHERE [SKU Code] = ?
             """
@@ -270,12 +269,14 @@ def get_sku_data(sku_number, country):
                     "rsp": round(row_qatar[0], 2),
                     "bptt": round(row_qatar[1],2),
                     "cif": round(row_qatar[2],2),
+                    "rsppercase":round(row_qatar[3],2), 
+                    "currency":"QAR"
                 })
         
         elif country == 'Kuwait':
             query_kuwait = """
             SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case]
+                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
             FROM Kuwait_PS_New
             WHERE [SKU Code] = ?
             """
@@ -286,12 +287,14 @@ def get_sku_data(sku_number, country):
                     "rsp": round(row_kuwait[0],2),
                     "bptt": round(row_kuwait[1], 2),
                     "cif": round(row_kuwait[2]),
+                    "rsppercase":round(row_kuwait[3],2),
+                    "currency":"KWD"
                 })
 
         elif country == 'Oman':
             query_oman = """
             SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case]
+                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
             FROM Oman_PS_New
             WHERE [SKU Code] = ?
             """
@@ -302,12 +305,14 @@ def get_sku_data(sku_number, country):
                     "rsp": round(row_oman[0],2),
                     "bptt": round(row_oman[1],2),
                     "cif": round(row_oman[2],2),
+                    "rsppercase":round(row_oman[3],2),
+                    "currency":"OMR"
                 })
 
         elif country == 'Bahrain':
             query_bahrain = """
             SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case]
+                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
             FROM Bahrain_PS_New
             WHERE [SKU Code] = ?
             """
@@ -318,12 +323,14 @@ def get_sku_data(sku_number, country):
                     "rsp": round(row_bahrain[0],2),
                     "bptt": round(row_bahrain[1],2),
                     "cif": round(row_bahrain[2],2),
+                    "rsppercase":round(row_bahrain[3],2),
+                    "currency":"BHD"
                 })
 
         elif country == 'KSA':
             query_ksa = """
             SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case]
+                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
             FROM KSA_PS_New
             WHERE [SKU Code] = ?
             """
@@ -334,12 +341,14 @@ def get_sku_data(sku_number, country):
                     "rsp": round(row_ksa[0],2),
                     "bptt": round(row_ksa[1]),
                     "cif": round(row_ksa[2]),
+                    "rsppercase":round(row_ksa[3],2),
+                    "currency":"SAR"
                 })
 
         elif country == 'UAE':
             query_uae = """
             SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case]
+                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
             FROM UAE_PS_New
             WHERE [SKU Code] = ?
             """
@@ -350,6 +359,8 @@ def get_sku_data(sku_number, country):
                     "rsp": round(row_uae[0],2),
                     "bptt": round(row_uae[1],2),
                     "cif": round(row_uae[2],2),
+                    "rsppercase":round(row_uae[3],2),
+                    "currency":"AED"
                 })
                 
                 
@@ -379,16 +390,60 @@ def next_page():
     return render_template('formupdate.html')
 
 
-@app.route("/get_skus", methods=["GET"])
-def get_skus():
+# @app.route("/get_skus", methods=["GET"])
+# def get_skus():
+#     try:
+#         # Connect to the database
+#         conn = pyodbc.connect(conn_str)
+#         cursor = conn.cursor()
+
+#         # Query the database for distinct SKU values
+#         cursor.execute("SELECT DISTINCT [SKU Code] FROM SKU_tts")  # Adjust table/column names if needed
+#         skus = [row[0] for row in cursor.fetchall()]  # Fetch all SKUs into a list
+
+#         # Close the connection
+#         conn.close()
+
+#         return jsonify({"skus": skus}), 200
+#     except Exception as e:
+#         print("Error:", e)
+#         return jsonify({"error": "Failed to fetch SKUs"}), 500
+
+@app.route("/get_sku_descriptions", methods=["GET"])
+def get_sku_descriptions():
     try:
         # Connect to the database
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
 
-        # Query the database for distinct SKU values
-        cursor.execute("SELECT DISTINCT [SKU Code] FROM SKU_tts")  # Adjust table/column names if needed
-        skus = [row[0] for row in cursor.fetchall()]  # Fetch all SKUs into a list
+        # Query the database for distinct SKU descriptions
+        cursor.execute("SELECT DISTINCT [SKU Description] FROM SKU_tts")  # Adjust table/column names if needed
+        descriptions = [row[0] for row in cursor.fetchall()]  # Fetch all descriptions into a list
+
+        # Close the connection
+        conn.close()
+
+        return jsonify({"descriptions": descriptions}), 200
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"error": "Failed to fetch descriptions"}), 500
+
+
+@app.route("/get_skus_by_description", methods=["POST"])
+def get_skus_by_description():
+    try:
+        data = request.json
+        description = data.get("description")
+
+        # Connect to the database
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+
+        # Query the database for SKUs matching the description
+        cursor.execute(
+            "SELECT DISTINCT [SKU Code] FROM SKU_tts WHERE [SKU Description] = ?", description
+        )
+        skus = [row[0] for row in cursor.fetchall()]  # Fetch matching SKUs into a list
 
         # Close the connection
         conn.close()
@@ -397,6 +452,7 @@ def get_skus():
     except Exception as e:
         print("Error:", e)
         return jsonify({"error": "Failed to fetch SKUs"}), 500
+
 
 @app.route("/get_sku_info", methods=["POST"])
 def get_sku_info():
@@ -411,6 +467,8 @@ def get_sku_info():
         return jsonify(sku_info), 200
     else:
         return jsonify({"error": f"SKU {sku_number} does not exist for {country}"}), 404
+    
+
 
 @app.route('/calculate_results', methods=['POST'])
 def calculate_results():
@@ -428,47 +486,39 @@ def calculate_results():
         new_cc = float(data.get('newCC', 0))
         new_bd = float(data.get('newBD', 0))
         new_cpp = float(data.get('newCPP', 0))
-        print("this is the cpp", new_cpp)
+        
+        
         pcs = float(data.get('pcs'))
         new_tts_percentage = float(data.get('newTTS', 0))
         new_tts = new_tts_percentage / 100
-        print("this is the new tts percentage", new_tts_percentage)
-        print("this is the new tts percentage", new_tts)
-
-        print("this is the pieces per case", pcs)
-        print("this is the dm",new_dm)
+      
         rsp_without_vat = new_rsp / (1 + new_vat)
-        print("this is rsp without vat",rsp_without_vat)
+        
         rsp_per_case = rsp_without_vat * pcs
-        print("this is rsp per case",rsp_per_case)
+      
         retail_markup = rsp_per_case / (1 + new_rm)
-        print("this is retail markuo",retail_markup)
+      
         bptt = retail_markup / (1 + new_wsm)
-        print("this is the new bptt",bptt)
+       
         dplc = bptt / (1 + new_dm)
-        print("this is dplc",dplc)
+        
         cif = (dplc / (1 + new_duty + new_cc)) - new_bd
-        print("this is the new cif",cif)
+        
         
         
         
         gsv = cif / (1 + new_cpp)
         
-        print("this is the gsv", gsv)
+      
         tts = gsv * new_tts
-        print("this is the tts", tts)
         to = gsv - tts
-        print("this is the to", to)
         cogs_per_case = float(data.get("cogs_local_per_case", 0))
-        print("this is the cogs", cogs_per_case)
         gp = to - cogs_per_case
         
-        print("this is the gp", gp)
         
         
-        gm = gp / to
-        
-        print("this is the gross margin", gm)
+        gm = gp / to 
+        gm_percentage = gm * 100
 
         print(bptt)
         print(cif)
@@ -480,14 +530,76 @@ def calculate_results():
             "tts":tts, 
             "to":to,
             "gp":gp, 
-            "gm":gm, 
+            "gm":gm_percentage, 
             "tts_percentage": new_tts_percentage,
             "cogs":cogs_per_case, 
-            
+            "vat":new_vat,
+            "rm":new_rm,
+            "wsm":new_wsm,
+            "dm":new_dm,
+            "clearingcharges":new_cc,
+            "bd":new_bd,
+            "cpp":new_cpp
         })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    
+    
+# @app.route('/calculate_new_results', methods=['POST'])
+# @login_required
+# def calculate_new_results():
+#   
+    
+@app.route('/calculate_new_results', methods=['POST'])
+@login_required
+def calculate_new_results():
+    try:
+        data = request.get_json()
+        request_id = data.get('request_id')
+        new_tts = data.get('new_tts')
+
+        if not request_id or new_tts is None:
+            return jsonify({"error": "Missing request_id or new_tts value"}), 400
+
+        # Connect to the database
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+
+        # Fetch the record based on the request_id
+        cursor.execute("SELECT * FROM ApprovalRequestsWithDetails WHERE id = ?", request_id)
+        record = cursor.fetchone()
+
+        if not record:
+            return jsonify({"error": "Record not found"}), 404
+
+        # Convert Decimal values to float
+        gsv = float(record.gsv)
+        cogs = float(record.cogs)
+
+        # Perform calculations
+        new_tts_per = float(new_tts / 100)
+        new_tts_value = round(new_tts_per * gsv,2)
+        new_to_value = round(gsv - new_tts_value,2)
+        new_gp_value = round(new_to_value - cogs,2)
+        new_gm_value = round((new_gp_value / new_to_value) * 100,2 ) # Convert to percentage
+
+        # Prepare updated values
+        updated_values = {
+            "new_tts": new_tts_value,
+            "new_to": new_to_value,
+            "new_gp": new_gp_value,
+            "new_gm": new_gm_value,  # Already in percentage form
+        }
+
+        conn.close()
+
+        return jsonify({"success": True, "updated_values": updated_values}), 200
+
+    except Exception as e:
+        print("Error calculating new results:", e)
+        return jsonify({"error": "Failed to calculate new results"}), 500
+
 
 @app.route('/submit_request', methods=['POST'])
 @login_required
@@ -499,7 +611,7 @@ def submit_request():
 
     sku_code = data['sku_code']
     country = data['country']
-    rsp = data['new_rsp']
+    rsp = (data['new_rsp'])
     tts_percentage = data['new_tts']
     bptt_new = data['bptt']
     cif_new = data["cif"]
@@ -508,18 +620,55 @@ def submit_request():
     gp_new = data["gp"]
     gm_new = data["gm"]
     cogs_new = data["cogs"]
+    sku_description = data["sku_description"]
+    vat = data["newVat"]
+    rm = data["newRM"]
+    wsm = data["newWSM"]
+    dm = data["newDM"]
+    duty = data["newDuty"]
+    cc = data["newCC"]
+    bd = data["newBD"]
+    cpp = data["newCPP"]
+    pcs = data["pcs"]
+    
+
+    
+    # print(vat)
+    
+    # print(sku_description)
 
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
 
     # Fetch approvers
     cursor.execute("SELECT id, username FROM users WHERE role = 'ttsapprover'")
-    finance = cursor.fetchone()
-
-    cursor.execute("SELECT id, username FROM users WHERE role = 'cogsapprover'")
-    cogs_approver = cursor.fetchone()
+    finance = cursor.fetchone() # current approver
     
-    if not finance or not cogs_approver:
+    cursor.execute("""
+        SELECT CD_Manager
+        FROM CountryDetails
+        WHERE Country = ?""", 
+        country)
+    
+    
+    cd_manager_name = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT id 
+        FROM users 
+        WHERE role = 'cdmanager' AND name = ?
+    """, cd_manager_name[0])
+    cd_manager_row = cursor.fetchone()
+    
+    if not cd_manager_row:
+        return jsonify({"error": f"No CD manager found for country {country}"}), 400
+
+    cd_manager_id = cd_manager_row[0]
+
+    # cursor.execute("SELECT id, username FROM users WHERE role = 'cogsapprover'")
+    # cogs_approver = cursor.fetchone()
+    
+    if not finance:
         return "Approvers not found", 404
     
     updated_at = datetime.datetime.now()  # Current timestamp
@@ -540,14 +689,23 @@ def submit_request():
                           WHERE id = ?""", existing_id)
 
     # Insert the new request for TTS approval
-    cursor.execute("""INSERT INTO ApprovalRequestsWithDetails 
-                      (sku_code, country, requester_id, current_approver_id, approver_name, rsp, 
-                       tts_percentage, status, bptt, cif, gsv, too, gp, gm, cogs, 
-                       requester_name, approval_type, next_approver_id, request_id) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                   sku_code, country, current_user.id, finance[0], finance[1], rsp, tts_percentage,
-                   'Pending', bptt_new, cif_new, gsv_new, to_new, gp_new, gm_new, cogs_new,
-                   current_user.username, 'TTS', cogs_approver[0], request_id)
+    cursor.execute(
+    """
+    INSERT INTO ApprovalRequestsWithDetails 
+        (sku_code, country, requester_id, current_approver_id, approver_name, rsp, 
+         tts_percentage, status, bptt, cif, gsv, too, gp, gm, cogs, 
+         requester_name, approval_type, next_approver_id, request_id, sku_description,
+         vat, rm, wsm, dm, duty, [clearingcharges], bd, cpp, pieces_per_case)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+    """,
+    (
+        sku_code, country, current_user.id, finance[0], finance[1], rsp, tts_percentage,
+        'Pending', bptt_new, cif_new, gsv_new, to_new, gp_new, gm_new, cogs_new,
+        current_user.username, 'TTS', cd_manager_id, request_id, sku_description, 
+        vat, rm, wsm, dm, duty, cc, bd, cpp, pcs,
+    )
+)
+
 
     conn.commit()
     conn.close()
@@ -582,35 +740,17 @@ def approve_tts():
     # Approve TTS and update the SKU_tts table and assign the approval to the next person aka cogs approver
     cursor.execute("""
         UPDATE ApprovalRequestsWithDetails 
-        SET status = 'TTS Approved', updated_at = GETDATE(), approval_type = 'COGS', 
+        SET status = 'TTS Approved', updated_at = GETDATE(), approval_type = 'CD Manager Approval', 
+        current_approver_id = next_approver_id,
         next_approver_id = (
             SELECT id FROM users WHERE role = 'manager'
             ), 
-        current_approver_id = (
-            SELECT id FROM users WHERE role = 'cogsapprover'
-        ),
         approver_name = (
             SELECT name FROM users WHERE role = 'ttsapprover'
         ), 
         request_id = ?
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'TTS'
     """, request_id_code, request_id, current_user.id)
-
-    # cursor.execute("""
-    #     SELECT sku_code, tts_percentage 
-    #     FROM ApprovalRequestsWithDetails 
-    #     WHERE id = ?
-    # """, request_id)
-    # request_details = cursor.fetchone()
-
-    # if request_details:
-    #     sku_code, tts_percentage = request_details
-    #     tts_percentage = tts_percentage / 100
-    #     cursor.execute("""
-    #         UPDATE SKU_tts 
-    #         SET [TTS%] = ?
-    #         WHERE [SKU Code] = ?
-    #     """, tts_percentage, sku_code)
 
     conn.commit()
     conn.close()
@@ -660,6 +800,137 @@ def reject_tts():
     conn.close()
 
     return jsonify({"message": "TTS request rejected successfully."}), 200
+
+@app.route('/change_tts', methods=['POST'])
+@login_required
+def change_tts():
+    if current_user.role != 'ttsapprover':
+        return "Unauthorized", 403
+
+    data = request.get_json()
+    request_id = data['request_id']
+    new_tts = data['new_tts']
+
+    if new_tts > 100:
+        return jsonify({"error": "TTS percentage cannot exceed 100"}), 400
+
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
+
+    # Fetch request details
+    cursor.execute("""
+        SELECT requester_id, next_approver_id FROM ApprovalRequestsWithDetails 
+        WHERE id = ? AND current_approver_id = ? AND approval_type = 'TTS'
+    """, request_id, current_user.id)
+    request_data = cursor.fetchone()
+
+    if not request_data:
+        conn.close()
+        return jsonify({"error": "Request not found or unauthorized"}), 404
+
+    requester_id, next_approver_id = request_data
+
+    # Update the TTS % and set current_approver_id to requester_id
+    cursor.execute("""
+        UPDATE ApprovalRequestsWithDetails
+        SET tts_percentage = ?, 
+            status = 'Updated TTS%', 
+            approval_type= 'TTS Updated',
+            current_approver_id = ?, 
+            updated_at = GETDATE()
+        WHERE id = ?
+    """, new_tts, requester_id, request_id)
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "TTS updated successfully"}), 200
+
+@app.route('/approve_new_tts', methods=['POST'])
+@login_required
+def approve_new_tts():
+    data = request.json
+    request_id = data.get('request_id')
+
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE ApprovalRequestsWithDetails
+            SET status = 'TTS Approved', updated_at = GETDATE(), 
+            approval_type = 'CD Manager Approval', 
+            current_approver_id = next_approver_id, 
+            approver_name = (
+            SELECT name FROM users WHERE id = ?
+            ), 
+            next_approver_id = (
+            SELECT id FROM users WHERE role = 'manager'
+            )
+            WHERE id = ?
+        """, current_user.id, request_id)
+        conn.commit()
+        return jsonify({"message": "New TTS approved"}), 200
+    except Exception as e:
+        print("Error approving TTS:", e)
+        return jsonify({"error": "Failed to approve TTS"}), 500
+    finally:
+        conn.close()
+
+@app.route('/change_rsp', methods=['POST'])
+@login_required
+def change_rsp():
+    data = request.json
+    request_id = data.get('request_id')
+    new_rsp = data.get('new_rsp')
+
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE ApprovalRequestsWithDetails
+            SET rsp = ?, status = 'TTS Approved', 
+            updated_at = GETDATE(), 
+            approval_type = 'CD Manager Approval', 
+            approver_name = (
+            SELECT name FROM users WHERE id = ?
+            ), 
+            current_approver_id = next_approver_id, 
+            next_approver_id = (
+            SELECT id FROM users WHERE role = 'manager'
+            )
+            WHERE id = ?
+        """, new_rsp, current_user.id, request_id)
+        conn.commit()
+        return jsonify({"message": "RSP updated"}), 200
+    except Exception as e:
+        print("Error updating RSP:", e)
+        return jsonify({"error": "Failed to update RSP"}), 500
+    finally:
+        conn.close()
+
+@app.route('/close_request', methods=['POST'])
+@login_required
+def close_request():
+    data = request.json
+    request_id = data.get('request_id')
+
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE ApprovalRequestsWithDetails
+            SET status = 'INACTIVE', current_approver_id = null
+            WHERE id = ?
+        """, request_id)
+        conn.commit()
+        return jsonify({"message": "Request closed"}), 200
+    except Exception as e:
+        print("Error closing request:", e)
+        return jsonify({"error": "Failed to close request"}), 500
+    finally:
+        conn.close()
+  
+    
 
 
 @app.route('/approve_cogs', methods=['POST'])
@@ -926,7 +1197,7 @@ def all_requests():
             "gsv": row[11],
             "too": row[12],
             "gp": row[13],
-            "gm": row[14] * 100,
+            "gm": row[14],
             "cogs": row[15],
             "requester_name": row[16],
             "created_at": row[17],
@@ -1101,7 +1372,7 @@ def approved_requests():
 @app.route("/approve_pre_final", methods=["POST"])
 @login_required
 def approve_pre_final():
-    if current_user.role != 'manager':
+    if current_user.role != 'cdmanager':
         return "Unauthorized", 403
     
     data = request.get_json()
@@ -1129,11 +1400,11 @@ def approve_pre_final():
             current_approver_id = next_approver_id, 
             next_approver_id = null, 
             approver_name = (
-                SELECT name FROM users WHERE role = 'manager'
+                SELECT name FROM users WHERE id = ?
             ), 
             request_id = ?
-        WHERE id = ? AND current_approver_id = ? AND approval_type = 'Approval'
-    """, request_id_code, request_id, current_user.id)
+        WHERE id = ? AND current_approver_id = ? AND approval_type = 'CD Manager Approval'
+    """, current_user.id, request_id_code, request_id, current_user.id)
     
     conn.commit()
     conn.close()
@@ -1143,7 +1414,7 @@ def approve_pre_final():
 @app.route("/reject_pre_final", methods=["POST"])
 @login_required
 def reject_pre_final():
-    if current_user.role != 'manager':
+    if current_user.role != 'cdmanager':
         return "Unauthorized", 403
 
     data = request.get_json()
@@ -1182,11 +1453,11 @@ def reject_pre_final():
             current_approver_id = NULL, 
             next_approver_id = NULL, 
             approver_name = (
-                SELECT name FROM users WHERE role = 'manager'
+                SELECT name FROM users WHERE id = ?
             ), 
             request_id = ?
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'Final Approval'
-    """, request_id_code, request_id, current_user.id)
+    """, current_user.id, request_id_code, request_id, current_user.id)
 
     conn.commit()
     conn.close()
@@ -1197,7 +1468,7 @@ def reject_pre_final():
 @app.route("/approve_final", methods=["POST"])
 @login_required
 def final_approval():
-    if current_user.role != 'cdmanager':
+    if current_user.role != 'manager':
         return "Unauthorized", 403
     
     data = request.get_json()
@@ -1302,7 +1573,7 @@ def final_approval():
 @app.route("/reject_final", methods=["POST"])
 @login_required
 def final_reject():
-    if current_user.role != 'cdmanager':
+    if current_user.role != 'manager':
         return "Unauthorized", 403
     
     data = request.get_json()
@@ -1549,14 +1820,36 @@ def export_pdf_file():
     
     formatted_date = updated_At.strftime("%Y-%m-%d")
     
+    
+    
+    
     if country == 'Qatar':
         currency = 'QAR'
+        query_qatar = """
+        SELECT [Pack_Type]
+        FROM SKU_Master$ExternalData_2
+        WHERE [Material_Code] = ?
+        """
+        cursor.execute(query_qatar, (sku_code,))
+        enitity_qatar = cursor.fetchone()
+        if enitity_qatar:
+            if enitity_qatar[0] =='Tea Bags':
+                sales_organization = 5800
+            else:
+                sales_organization = 3330
         
-    elif country in ['KSA', 'Oman', 'Bahrain', 'UAE']:
+    elif country in ['KSA', 'Oman', 'Bahrain']:
         currency = 'USD'
+        sales_organization = 3330
         
     elif country == 'Kuwait':
         currency = 'KWD'
+        sales_organization = 3330
+        
+    elif country == 'UAE':
+        sales_organization = 3300
+        
+    
     
     entity_int = int(entity)
     entity_string = str(entity_int)
@@ -1570,12 +1863,11 @@ def export_pdf_file():
         "country": country, 
         "effective_date_from": formatted_date,
         "effective_date_till": "Till next communication of Price update", 
-        "invoicing_currency": full_string  , 
-        "invoicing_entity": full_string2,
+        "invoicing_currency": currency , 
+        "invoicing_entity": sales_organization,
         "finance_member": "Kunal Thakwani",
         "table_data": [
-            [
-                entity, 
+            [ 
                 sku_code,
                 db_sku, 
                 desc,
@@ -1750,8 +2042,7 @@ def all_marketing_requests():
         conn.close()
 
     
-    
-    
+
 
 @app.route('/update_currency', methods=['POST'])
 def update_currency():

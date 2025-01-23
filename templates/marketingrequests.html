@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Approvals Dashboard</title>
@@ -26,7 +30,6 @@
       }
     </style>
     <script>
-      
       async function loadApprovals() {
         const approvalsContainer =
           document.getElementById("approvalsContainer");
@@ -60,10 +63,18 @@
                 <p><strong>GP:</strong> ${approval.gp}</p>
               `;
 
+              if (approval.status === "Updated TTS%") {
+                card.innerHTML += `
+              <button class="btn btn-success btn-sm" onclick="approveNewTTS('${approval.id}')">Approve TTS</button>
+              <button class="btn btn-warning btn-sm" onclick="showChangeRSPModal('${approval.id}', ${approval.rsp})">Change RSP</button>
+              <button class="btn btn-danger btn-sm" onclick="closeRequest('${approval.id}')">Close Request</button>
+            `;
+              }
+
               approvalsContainer.appendChild(card);
             });
           } else {
-            approvalsContainer.innerHTML = "<p>No pending approvals.</p>";
+            approvalsContainer.innerHTML = "<p>No requests found.</p>";
           }
         } catch (error) {
           console.error("Error fetching approvals:", error);
@@ -72,7 +83,86 @@
         }
       }
 
-      
+      async function approveNewTTS(requestId) {
+        if (
+          confirm(
+            "Are you sure you want to approve the new TTS and send to the next approver?"
+          )
+        ) {
+          try {
+            const response = await fetch("/approve_new_tts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ request_id: requestId }),
+            });
+            if (response.ok) {
+              alert("New TTS approved and sent to next approver.");
+              loadApprovals();
+            } else {
+              alert("Failed to approve new TTS.");
+            }
+          } catch (error) {
+            console.error("Error approving new TTS:", error);
+          }
+        }
+      }
+
+      // Show Change RSP Modal
+      function showChangeRSPModal(requestId, currentRSP) {
+        currentRequestId = requestId;
+        document.getElementById("newRSPValue").value = currentRSP;
+        $("#changeRSPModal").modal("show");
+      }
+
+      async function submitNewRSP() {
+        const newRSP = parseFloat(document.getElementById("newRSPValue").value);
+        if (isNaN(newRSP)) {
+          alert("Please enter a valid RSP value.");
+          return;
+        }
+
+        try {
+          const response = await fetch("/change_rsp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              request_id: currentRequestId,
+              new_rsp: newRSP,
+            }),
+          });
+
+          if (response.ok) {
+            alert("New RSP submitted and sent to the next approver.");
+            $("#changeRSPModal").modal("hide");
+            loadApprovals();
+          } else {
+            alert("Failed to submit new RSP.");
+          }
+        } catch (error) {
+          console.error("Error submitting new RSP:", error);
+        }
+      }
+
+      // Close Request
+      async function closeRequest(requestId) {
+        if (confirm("Are you sure you want to close this request?")) {
+          try {
+            const response = await fetch("/close_request", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ request_id: requestId }),
+            });
+            if (response.ok) {
+              alert("Request closed successfully.");
+              loadApprovals();
+            } else {
+              alert("Failed to close the request.");
+            }
+          } catch (error) {
+            console.error("Error closing the request:", error);
+          }
+        }
+      }
     </script>
   </head>
   <body onload="loadApprovals()">
@@ -83,8 +173,48 @@
       </div>
       <a href="/logout" class="btn btn-secondary mt-3">Logout</a>
       <a href="/dashboard" class="btn btn-secondary mt-3">Go Back</a>
-
     </div>
-
+    <div class="modal fade" id="changeRSPModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Change RSP</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <label for="newRSPValue">New RSP:</label>
+            <input
+              type="number"
+              id="newRSPValue"
+              class="form-control"
+              placeholder="Enter new RSP"
+            />
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="submitNewRSP()"
+            >
+              Submit
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

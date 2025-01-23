@@ -33,7 +33,7 @@
         approvalsContainer.innerHTML = "<p>Loading approvals...</p>";
 
         try {
-          const response = await fetch("/pending_requests?approval_type=FinalApproval"); // Filter by approval_type=TTS
+          const response = await fetch("/pending_requests"); // Filter by approval_type=TTS
           const data = await response.json();
 
           console.log("Approvals Data:", data);
@@ -50,6 +50,8 @@
                   <h5>${approval.sku_code} - ${approval.country}</h5>
                   <span class="badge badge-info">${approval.status}</span>
                 </div>
+                <p><strong>SKU Description:</strong> ${approval.sku_description}</p>
+
                 <p><strong>Approval Type:</strong> ${approval.approval_type}</p>
                 <p><strong>Submitted By:</strong> ${approval.requester_name}</p>
                 <p><strong>Date:</strong> ${approval.created_at}</p>
@@ -80,7 +82,7 @@
       async function approveTTS(approvalId) {
         if (confirm("Are you sure you want to approve this request?")) {
           try {
-            const response = await fetch(`/approve_final`, {
+            const response = await fetch(`/approve_pre_final`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

@@ -60,8 +60,10 @@
         if (response.ok) {
           displaySection.innerHTML = `
           <h3>SKU Details:</h3>
-          <p><strong>Description:</strong> ${data.description}</p>
-          <p><strong>Brand:</strong> ${data.brand}</p>
+          <div class="display-values">
+          <p><strong>Description:</strong></p>
+          <p id="description"> ${data.description}</p>
+          </div>          <p><strong>Brand:</strong> ${data.brand}</p>
           <p><strong>Sector:</strong> ${data.sector}</p>
           <p><strong>Flavor:</strong> ${data.flavor}</p>
           <p><strong>Format:</strong> ${data.format}</p>
@@ -69,43 +71,39 @@
           <p><strong>Project:</strong> ${data.project}</p>
           <p><strong>Type:</strong> ${data.type}</p>
          <div class="display-values">
-          <p><strong>VAT:</strong></p>
-          <p id="vat"> ${data.vat}</p>
+          <p><strong>VAT %:</strong></p>
+          <p id="vat"> ${data.vat}%</p>
           </div>
           <div class="display-values">
-          <p><strong>RM:</strong></p>
-          <p id="rm"> ${data.rm}</p>
+          <p><strong>RM %:</strong></p>
+          <p id="rm"> ${data.rm}%</p>
           </div>
           
           <div class="display-values">
-          <p><strong>WSM:</strong></p>
-          <p id="wsm"> ${data.wsm}</p>
+          <p><strong>WSM %:</strong></p>
+          <p id="wsm"> ${data.wsm}%</p>
           </div>
 
           <div class="display-values">
-          <p><strong>DM:</strong></p>
-          <p id="dm"> ${data.dm}</p>
+          <p><strong>DM %:</strong></p>
+          <p id="dm"> ${data.dm}%</p>
           </div>
           <div class="display-values">
-          <p><strong>Duty:</strong></p>
-          <p id="duty"> ${data.duty}</p>
+          <p><strong>Duty %:</strong></p>
+          <p id="duty"> ${data.duty}%</p>
           </div>
           <div class="display-values">
-          <p><strong>Clearing Charges:</strong></p>
-          <p id="cc"> ${data.cc}</p>
+          <p><strong>Clearing Charges %:</strong></p>
+          <p id="cc"> ${data.clearingcharges}%</p>
           </div>
 
           <div class="display-values">
-          <p><strong>Bad and Damages:</strong></p>
-          <p id="bd"> ${data.bd}</p>
+          <p><strong>Bad and Damages %:</strong></p>
+          <p id="bd"> ${data.bd}%</p>
           </div>
           <div class="display-values">
-          <p><strong>CPP:</strong></p>
-          <p id="cpp"> ${data.cpp}</p>
-          </div>
-          <div class="display-values">
-          <p><strong>RSP including VAT (per piece):</strong></p>
-          <p id="rsp"> ${data.rsp}</p>
+          <p><strong>CPP %:</strong></p>
+          <p id="cpp"> ${data.cpp}%</p>
           </div>
           <div class="display-values">
           <p><strong>BPTT (per case):</strong></p>
@@ -115,42 +113,74 @@
           <p><strong>CIF (per case):</strong></p>
           <p id="cif"> ${data.cif}</p>
           </div>
-          <p><strong>Pieces per case :</strong></p>
-          <p id="pcs"> ${data.pcs_per_case}</p>
+          <div class="display-values">
+          <p><strong>RSP (per case):</strong></p>
+          <p id="rsppercase"> ${data.rsppercase}</p>
           </div>
-          <p><strong>Case per ton :</strong></p>
-          <p id="case_per_ton"> ${data.case_per_ton}</p>
-          </div>
-          <p><strong>Total cogs per ton(in USD)</strong></p>
-          <p id="cogs_usd"> ${data.total_cogs_usd}</p>
-          </div>
-          <p><strong>Total cogs per ton (in local currency)</strong></p>
-          <p id="cogs_local"> ${data.total_cogs_local}</p>
-          </div>
-          <p><strong>Total cogs per case (in local currency)</strong></p>
+          <div class = "display-values">
+          <p><strong>Total cogs per case (in ${data.currency}): </strong></p>
           <p id="cogs_local_case"> ${data.cogs_per_case}</p>
           </div>
-          <p><strong>TTS%</strong></p>
+          <div class = "display-values">
+          <p><strong>Pieces per case:</strong></p>
+          <p id="pcs"> ${data.pcs_per_case}</p>
+          </div>
+          <div class="display-values">
+          <p><strong>RSP including VAT (per piece):</strong></p>
+          <p id="rsp"> ${data.rsp}</p>
+          </div>
+          <div class = "display-values">
+          <p><strong>Case per ton:</strong></p>
+          <p id="case_per_ton"> ${data.case_per_ton}</p>
+          </div>
+          <div class = "display-values">
+          <p><strong>Total cogs per ton (in USD):</strong></p>
+          <p id="cogs_usd"> ${data.total_cogs_usd}</p>
+          </div>
+          <div class = "display-values">
+          <p><strong>Total cogs per ton (in ${data.currency}):</strong></p>
+          <p id="cogs_local"> ${data.total_cogs_local}</p>
+          </div>
+          <div class = "display-values">
+          <p><strong>TTS%:</strong></p>
           <p id="tts"> ${data.tts}</p>
           </div>
           <div class="form-group">
-           <label for="newRSP">New RSP</label>
+           <label for="newRSP">New RSP (in ${data.currency}) (per case)</label>
              <input 
               type="text" 
               class="form-control" 
               id="newRSP" 
               placeholder="New RSP">
-            <label for="newTTS">New TTS</label>
+            <label for="newTTS">New TTS (in %)</label>
              <input 
               type="text" 
               class="form-control" 
               id="newTTS" 
-              placeholder="New TTS (in %)">
+              placeholder="New TTS (in %)"
+              oninput="validateTTS()">
+            <p id="errorTTS" style="color: red; display: none;">TTS cannot exceed 100%</p>
             <button type="submit" class="btn btn-primary"onclick="calculate_values()">Calculate</button>
           </div> 
         `;
         } else {
           displaySection.innerHTML = `<p style="color: red;">${data.error}</p>`;
+        }
+      }
+
+      function validateTTS() {
+        const ttsInput = document.getElementById("newTTS");
+        const errorTTS = document.getElementById("errorTTS");
+        const calculateBtn = document.getElementById("calculateBtn");
+
+        const ttsValue = parseFloat(ttsInput.value);
+
+        if (ttsValue > 100) {
+          errorTTS.style.display = "block"; // Show error message
+          calculateBtn.disabled = true; // Disable the button
+        } else {
+          errorTTS.style.display = "none"; // Hide error message
+          calculateBtn.disabled = false; // Enable the button
         }
       }
 
@@ -239,18 +269,18 @@
           document.getElementById("skuInfo").innerHTML += `
       <h3>Calculated Values:</h3>
   <div class="display-values">
-    <p><strong>New BPTT (per case level):</strong></p>
+    <p><strong>New BPTT (per case):</strong></p>
         <p id="new_bptt"> ${data.newBPTT.toFixed(2)}</p>
   </div>
       
   <div class="display-values">
-    <p><strong>New CIF (per case level):</strong></p>
+    <p><strong>New CIF (per case):</strong></p>
       <p id="new_cif"> ${data.newCIF.toFixed(2)}</p>
   </div>
 
 
     <div class="display-values">
-     <p><strong>RSP (per piece level):</strong></p>
+     <p><strong>RSP (per piece):</strong></p>
           <p id="new_rsp"> ${data.newRSP.toFixed(2)}</p>
     </div>
 
@@ -266,8 +296,9 @@
   </div>
 
   <div class="display-values">
-    <p><strong>TTS %:</strong></p>
+    <p><strong>TTS%:</strong></p>
       <p id="new_tts_percentage"> ${data.tts_percentage.toFixed(2)}</p>
+      <p>%</p>
   </div>
   
   <div class="display-values">
@@ -288,8 +319,9 @@
         
 
   <div class="display-values">
-    <p><strong>Gross Margin:</strong></p>
+    <p><strong>Gross Margin %:</strong></p>
       <p id="gm"> ${data.gm.toFixed(2)}</p>
+      <p>%</p>
   </div>
 
 
@@ -308,16 +340,63 @@
         const newBPTT = document.getElementById("new_bptt").innerText;
         const newCIF = document.getElementById("new_cif").innerText;
         const newRSP = document.getElementById("new_rsp").innerText;
-        console.log("new rsp", newRSP)
+        console.log("new rsp", newRSP);
         const newGSV = document.getElementById("gsv").innerText;
         const tts = document.getElementById("new_tts_percentage").innerText;
-        console.log("new tts", tts)
+        console.log("new tts", tts);
         const to = document.getElementById("to").innerText;
         const gp = document.getElementById("gp").innerText;
         const gm = document.getElementById("gm").innerText;
         const cogs_new = document.getElementById("new_cogs").innerText;
-        console.log("cogs", cogs_new)
-        
+        const sku_description =
+          document.getElementById("description").innerText;
+        console.log("cogs", cogs_new);
+
+
+  
+
+        const newTTS = document.getElementById("newTTS").value;
+        console.log("this is the new tts %", newTTS);
+
+        const cogs_local_per_case =
+          document.getElementById("cogs_local_case").innerText;
+        console.log("this is the local cogs per case", cogs_local_per_case);
+        const pcs = document.getElementById("pcs").innerText;
+        console.log("this is the pcs", pcs);
+        const vat = document.getElementById("vat").innerText;
+        console.log(vat);
+        const newVat = removePercentageSign(vat);
+        console.log(newVat);
+        const rm = document.getElementById("rm").innerText;
+        console.log(rm);
+        const newRM = removePercentageSign(rm);
+        console.log(newRM);
+        const wsm = document.getElementById("wsm").innerText;
+        console.log(wsm);
+        const newWSM = removePercentageSign(wsm);
+        console.log(newWSM);
+        const dm = document.getElementById("dm").innerText;
+        console.log(dm);
+        const newDM = removePercentageSign(dm);
+        console.log(newDM);
+        const duty = document.getElementById("duty").innerText;
+        console.log(duty);
+        const newDuty = removePercentageSign(duty);
+        console.log(newDuty);
+        const cc = document.getElementById("cc").innerText;
+        console.log(cc);
+        const newCC = removePercentageSign(cc);
+        console.log(newCC);
+        const bd = document.getElementById("bd").innerText;
+        console.log(bd);
+        const newBD = removePercentageSign(bd);
+        console.log(newBD);
+        const cpp = document.getElementById("cpp").innerText;
+        console.log(cpp);
+        const newCPP = removePercentageSign(cpp);
+        console.log(newCPP);
+
+
         console.log({
           sku_code: skuCode,
           country: country,
@@ -330,6 +409,7 @@
           gp: gp,
           gm: gm,
           cogs: cogs_new,
+          sku_description: sku_description,
         });
 
         try {
@@ -350,6 +430,16 @@
               gp: gp,
               gm: gm,
               cogs: cogs_new,
+              sku_description: sku_description,
+              newVat,
+              newRM,
+              newWSM,
+              newDM,
+              newDuty,
+              newCC,
+              newBD,
+              newCPP,
+              pcs,
             }),
           });
 
@@ -372,9 +462,19 @@
       <h1>Price Structure</h1>
       <form onsubmit="fetchSKUInfo(event)">
         <div class="form-group">
+          <label for="descriptionSelect">SKU Description</label>
+          <select
+            class="form-control"
+            id="descriptionSelect"
+            onchange="fetchSKUsByDescription()"
+          >
+            <option value="">Loading Descriptions...</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="skuSelect">SKU Number</label>
-          <select id="skuSelect">
-            <option value="">Loading SKUs...</option>
+          <select class="form-control" id="skuSelect">
+            <option value="">Select Description First</option>
           </select>
         </div>
         <div class="form-group">
@@ -402,18 +502,84 @@
     </div>
     <script>
       // Function to populate the SKU dropdown
-      async function loadSKUs() {
-        const skuSelect = document.getElementById("skuSelect");
+      // async function loadSKUs() {
+      //   const skuSelect = document.getElementById("skuSelect");
+
+      //   try {
+      //     const response = await fetch("/get_skus"); // Call the backend route
+      //     const data = await response.json();
+
+      //     if (response.ok) {
+      //       // Clear existing options
+      //       skuSelect.innerHTML = '<option value="">Select SKU</option>';
+
+      //       // Add options dynamically
+      //       data.skus.forEach((sku) => {
+      //         const option = document.createElement("option");
+      //         option.value = sku;
+      //         option.textContent = sku;
+      //         skuSelect.appendChild(option);
+      //       });
+      //     } else {
+      //       console.error("Failed to fetch SKUs:", data.error);
+      //     }
+      //   } catch (error) {
+      //     console.error("Error fetching SKUs:", error);
+      //   }
+      // }
+
+      // // Load SKUs when the page loads
+      // window.onload = loadSKUs;
+
+      // Function to populate the SKU Description dropdown
+      async function loadDescriptions() {
+        const descriptionSelect = document.getElementById("descriptionSelect");
 
         try {
-          const response = await fetch("/get_skus"); // Call the backend route
+          const response = await fetch("/get_sku_descriptions");
           const data = await response.json();
 
           if (response.ok) {
-            // Clear existing options
+            descriptionSelect.innerHTML =
+              '<option value="">Select Description</option>';
+
+            data.descriptions.forEach((description) => {
+              const option = document.createElement("option");
+              option.value = description;
+              option.textContent = description;
+              descriptionSelect.appendChild(option);
+            });
+          } else {
+            console.error("Failed to fetch descriptions:", data.error);
+          }
+        } catch (error) {
+          console.error("Error fetching descriptions:", error);
+        }
+      }
+
+      // Function to fetch SKUs by selected description
+      async function fetchSKUsByDescription() {
+        const descriptionSelect = document.getElementById("descriptionSelect");
+        const skuSelect = document.getElementById("skuSelect");
+        const selectedDescription = descriptionSelect.value;
+
+        if (!selectedDescription) {
+          skuSelect.innerHTML =
+            '<option value="">Select Description First</option>';
+          return;
+        }
+
+        try {
+          const response = await fetch("/get_skus_by_description", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ description: selectedDescription }),
+          });
+          const data = await response.json();
+
+          if (response.ok) {
             skuSelect.innerHTML = '<option value="">Select SKU</option>';
 
-            // Add options dynamically
             data.skus.forEach((sku) => {
               const option = document.createElement("option");
               option.value = sku;
@@ -428,8 +594,8 @@
         }
       }
 
-      // Load SKUs when the page loads
-      window.onload = loadSKUs;
+      // Load descriptions when the page loads
+      window.onload = loadDescriptions;
     </script>
   </body>
 </html>

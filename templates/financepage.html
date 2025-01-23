@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Approvals Dashboard</title>
@@ -25,6 +29,7 @@
         margin: 0;
       }
     </style>
+
     <script>
       // Function to load pending TTS approvals for Alsafadi
       async function loadApprovals() {
@@ -50,17 +55,22 @@
                   <h5>${approval.sku_code} - ${approval.country}</h5>
                   <span class="badge badge-info">${approval.status}</span>
                 </div>
+                 <p><strong>SKU Description:</strong> ${approval.sku_description}</p>
+
                 <p><strong>Approval Type:</strong> ${approval.approval_type}</p>
                 <p><strong>Submitted By:</strong> ${approval.requester_name}</p>
                 <p><strong>Date:</strong> ${approval.created_at}</p>
-                <p><strong>New RSP:</strong> ${approval.rsp}</p>
+                 <p><strong>BPTT (per case):</strong> ${approval.bptt}</p>
+                 <p><strong>BPTT (per case):</strong> ${approval.cif}</p>
+                <p><strong>New RSP (per piece):</strong> ${approval.rsp}</p>
                 <p><strong>New TTS:</strong> ${approval.tts_percentage}%</p>
                 <p><strong>COGS:</strong> ${approval.cogs}</p>
-                <p><strong>GM:</strong> ${approval.gm}</p>
+                <p><strong>GM:</strong> ${approval.gm}%</p>
                 <p><strong>GP:</strong> ${approval.gp}</p>
 
                 <button class="btn btn-success btn-sm" onclick="approveTTS('${approval.id}')">Approve</button>
                 <button class="btn btn-danger btn-sm" onclick="rejectRequest('${approval.id}')">Reject</button>
+                <button class="btn btn-warning btn-sm" onclick="showChangeTTSModal('${approval.id}', ${approval.tts_percentage})">Change TTS %</button>
               `;
 
               approvalsContainer.appendChild(card);
@@ -131,6 +141,87 @@
         }
       }
 
+      let currentApprovalId = null;
+
+      function showChangeTTSModal(approvalId, currentTTS) {
+        currentApprovalId = approvalId;
+        document.getElementById("newTTSValue").value = currentTTS;
+        document.getElementById("ttsError").style.display = "none";
+        $("#changeTTSModal").modal("show");
+      }
+
+      async function submitChangeTTS() {
+        const newTTS = parseFloat(document.getElementById("newTTSValue").value);
+        const ttsError = document.getElementById("ttsError");
+
+        if (newTTS > 100) {
+          ttsError.style.display = "block";
+          return;
+        }
+
+        ttsError.style.display = "none";
+
+        try {
+          // Fetch the updated calculations first
+          const response = await fetch(`/calculate_new_results`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              request_id: currentApprovalId,
+              new_tts: newTTS,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            alert(`Failed to calculate results: ${errorData.error}`);
+            return;
+          }
+
+          const data = await response.json();
+          const { updated_values } = data;
+
+          // Display the updated calculations to the user
+          const confirmChange = confirm(`
+      New Calculations:
+      - New TTS: ${updated_values.new_tts}
+      - New  TO: ${updated_values.new_to}
+      - New GP: ${updated_values.new_gp}
+      - New GM: ${updated_values.new_gm} %
+
+      Do you want to proceed with this change?
+    `);
+
+          if (confirmChange) {
+            // Proceed with updating the TTS value
+            const updateResponse = await fetch(`/change_tts`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                request_id: currentApprovalId,
+                new_tts: newTTS,
+              }),
+            });
+
+            if (updateResponse.ok) {
+              alert("TTS % updated successfully!");
+              $("#changeTTSModal").modal("hide");
+              loadApprovals(); // Refresh the approvals list
+            } else {
+              const errorData = await updateResponse.json();
+              alert(`Failed to update TTS: ${errorData.error}`);
+            }
+          }
+        } catch (error) {
+          console.error("Error updating TTS:", error);
+          alert("Failed to update TTS. Please try again later.");
+        }
+      }
+
       // Load approvals when the page loads
       window.onload = loadApprovals;
     </script>
@@ -142,6 +233,53 @@
         <!-- Pending approvals will appear here -->
       </div>
       <a href="/logout" class="btn btn-secondary mt-3">Logout</a>
+    </div>
+
+    <div class="modal" id="changeTTSModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Change TTS %</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <label for="newTTSValue">New TTS %:</label>
+            <input
+              type="number"
+              id="newTTSValue"
+              class="form-control"
+              placeholder="Enter new TTS %"
+              max="100"
+            />
+            <p id="ttsError" style="color: red; display: none">
+              TTS % cannot exceed 100!
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="submitChangeTTS()"
+            >
+              Submit
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </body>
 </html>
