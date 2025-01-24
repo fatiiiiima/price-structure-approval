@@ -65,6 +65,8 @@
 
                 <button class="btn btn-success btn-sm" onclick="approveCOGS('${approval.id}')">Approve</button>
                 <button class="btn btn-danger btn-sm" onclick="rejectRequest('${approval.id}')">Reject</button>
+                <button class="btn btn-primary btn-sm" onclick="viewPDF('${approval.id}')">View PDF</button>
+
               `;
 
               approvalsContainer.appendChild(card);
@@ -135,6 +137,11 @@
         }
       }
 
+
+      function viewPDF(uniqueId) {
+        const url = `/export_pdf_file?unique_id=${uniqueId}`;
+        window.open(url, "_blank"); // Opens the PDF file in a new tab
+      }
       // Load approvals when the page loads
       window.onload = loadApprovals;
     </script>

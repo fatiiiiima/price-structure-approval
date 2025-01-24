@@ -69,15 +69,39 @@ def generate_price_structure_pdf(data):
 
     # Add data rows
     for label, value, percentage in zip(column_labels, 
-                                         [data["table_data"][0][0], data["table_data"][0][1], data["table_data"][0][2],
-                                          None, data["table_data"][0][5], None, data["table_data"][0][6],data["table_data"][0][7] ,
-                                          None, None,
-                                          data["table_data"][0][8], data["table_data"][0][9], 
-                                          data["table_data"][0][10], data["table_data"][0][11], 
-                                          data["table_data"][0][16], None, data["table_data"][0][18]],  # Values
-                                         [None, None, None, None, data["table_data"][0][4],
-                                          None, None, None, None, None, None, None, 
-                                          None, data["table_data"][0][17], data["table_data"][0][19]]  # Percentages
+                                         [data["table_data"][0][0], 
+                                          data["table_data"][0][1], 
+                                          data["table_data"][0][2],
+                                          None, 
+                                          data["table_data"][0][5], 
+                                          data["table_data"][0][6], 
+                                          data["table_data"][0][7],
+                                          data["table_data"][0][9] ,
+                                          data["table_data"][0][10], 
+                                          data["table_data"][0][12], 
+                                          data["table_data"][0][13], 
+                                          data["table_data"][0][15],
+                                          data["table_data"][0][16],
+                                          data["table_data"][0][18],
+                                          data["table_data"][0][20],
+                                        #   data["table_data"][0][21]
+                                        ],  # Values
+                                         [None, 
+                                          None, 
+                                          None, 
+                                          None, 
+                                          data["table_data"][0][4],
+                                          None, 
+                                          None, 
+                                          data["table_data"][0][8], 
+                                          None, 
+                                          data["table_data"][0][11], 
+                                          None, 
+                                          data["table_data"][0][14], 
+                                          None, 
+                                          data["table_data"][0][17], 
+                                          data["table_data"][0][19]],
+                                          #None # Percentages
                                          ):
         table_data.append([
             Paragraph(label, wrap_style),

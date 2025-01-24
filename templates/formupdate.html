@@ -17,6 +17,7 @@
       }
     </style>
     <script>
+      let currency = "";
       async function fetchSKUInfo(event) {
         event.preventDefault(); // Prevent form submission
 
@@ -37,27 +38,12 @@
         const data = await response.json();
         console.log("this is the response", data);
 
-        if (data.tts) {
-          console.log("TTS%:", data.tts);
-        }
-        if (data.total_cogs) {
-          console.log("Total COGS:", data.total_cogs_usd);
-        }
-        if (data.pcs_per_case) {
-          console.log("PCS per case", data.pcs_per_case);
-        }
-
-        if (data.currency_rate) {
-          console.log("currency rate", data.currency_rate);
-        }
-
-        if (data.total_cogs_local) {
-          console.log("local currency", data.total_cogs_local);
-        }
-
         // Update the display section
         const displaySection = document.getElementById("skuInfo");
         if (response.ok) {
+          currency = data.currency;
+          console.log("Currency:", currency);
+
           displaySection.innerHTML = `
           <h3>SKU Details:</h3>
           <div class="display-values">
@@ -105,6 +91,16 @@
           <p><strong>CPP %:</strong></p>
           <p id="cpp"> ${data.cpp}%</p>
           </div>
+
+          <div class="display-values">
+          <p><strong>RSP including VAT (per piece):</strong></p>
+          <p id="rsp"> ${data.rsp}</p>
+          </div>
+
+          <div class="display-values">
+          <p><strong>RSP (per case):</strong></p>
+          <p id="rsppercase"> ${data.rsppercase}</p>
+          </div>
           <div class="display-values">
           <p><strong>BPTT (per case):</strong></p>
           <p id="bptt"> ${data.bptt}</p>
@@ -113,10 +109,7 @@
           <p><strong>CIF (per case):</strong></p>
           <p id="cif"> ${data.cif}</p>
           </div>
-          <div class="display-values">
-          <p><strong>RSP (per case):</strong></p>
-          <p id="rsppercase"> ${data.rsppercase}</p>
-          </div>
+        
           <div class = "display-values">
           <p><strong>Total cogs per case (in ${data.currency}): </strong></p>
           <p id="cogs_local_case"> ${data.cogs_per_case}</p>
@@ -125,10 +118,7 @@
           <p><strong>Pieces per case:</strong></p>
           <p id="pcs"> ${data.pcs_per_case}</p>
           </div>
-          <div class="display-values">
-          <p><strong>RSP including VAT (per piece):</strong></p>
-          <p id="rsp"> ${data.rsp}</p>
-          </div>
+          
           <div class = "display-values">
           <p><strong>Case per ton:</strong></p>
           <p id="case_per_ton"> ${data.case_per_ton}</p>
@@ -146,7 +136,7 @@
           <p id="tts"> ${data.tts}</p>
           </div>
           <div class="form-group">
-           <label for="newRSP">New RSP (in ${data.currency}) (per case)</label>
+           <label for="newRSP">New RSP (in ${data.currency}) (per piece)</label>
              <input 
               type="text" 
               class="form-control" 
@@ -263,29 +253,37 @@
         });
 
         const data = await response.json();
+        console.log(data);
 
         if (response.ok) {
           // Display calculated values
           document.getElementById("skuInfo").innerHTML += `
       <h3>Calculated Values:</h3>
+   <div class="display-values">
+     <p><strong>RSP (per piece) (in ${currency}):</strong></p>
+          <p id="new_rsp"> ${data.newRSP.toFixed(2)}</p>
+    </div>
+
+       <div class="display-values">
+     <p><strong>New RSP (per case) (in ${currency}):</strong></p>
+          <p id="new_rsp_per_case"> ${data.newRSPPerCase}</p>
+    </div>
+
   <div class="display-values">
-    <p><strong>New BPTT (per case):</strong></p>
+    <p><strong>New BPTT (per case) (in ${currency}):</strong></p>
         <p id="new_bptt"> ${data.newBPTT.toFixed(2)}</p>
   </div>
       
   <div class="display-values">
-    <p><strong>New CIF (per case):</strong></p>
+    <p><strong>New CIF (per case) (in ${currency}):</strong></p>
       <p id="new_cif"> ${data.newCIF.toFixed(2)}</p>
   </div>
 
 
-    <div class="display-values">
-     <p><strong>RSP (per piece):</strong></p>
-          <p id="new_rsp"> ${data.newRSP.toFixed(2)}</p>
-    </div>
+ 
 
   <div class="display-values">
-    <p><strong>GSV:</strong></p>
+    <p><strong>GSV (per case) (in ${currency}):</strong></p>
        <p id="gsv"> ${data.newGSV.toFixed(2)}</p>
   </div>
 
@@ -302,17 +300,17 @@
   </div>
   
   <div class="display-values">
-    <p><strong>TTS:</strong></p>
+    <p><strong>TTS (per case) (in ${currency}):</strong></p>
       <p id="new_tts"> ${data.tts.toFixed(2)}</p>
   </div>
         
   <div class="display-values">
-    <p><strong>TO:</strong></p>
+    <p><strong>TO (per case) (in ${currency}):</strong></p>
       <p id="to"> ${data.to.toFixed(2)}</p>
   </div>
 
   <div class="display-values">
-    <p><strong>GP:</strong></p>
+    <p><strong>GP (per case) (in ${currency}):</strong></p>
      <p id="gp"> ${data.gp.toFixed(2)}</p>
   </div>
 
@@ -341,6 +339,7 @@
         const newCIF = document.getElementById("new_cif").innerText;
         const newRSP = document.getElementById("new_rsp").innerText;
         console.log("new rsp", newRSP);
+        const newRSPPerCase = document.getElementById("new_rsp_per_case").innerText;
         const newGSV = document.getElementById("gsv").innerText;
         const tts = document.getElementById("new_tts_percentage").innerText;
         console.log("new tts", tts);
@@ -351,9 +350,6 @@
         const sku_description =
           document.getElementById("description").innerText;
         console.log("cogs", cogs_new);
-
-
-  
 
         const newTTS = document.getElementById("newTTS").value;
         console.log("this is the new tts %", newTTS);
@@ -396,7 +392,6 @@
         const newCPP = removePercentageSign(cpp);
         console.log(newCPP);
 
-
         console.log({
           sku_code: skuCode,
           country: country,
@@ -410,6 +405,7 @@
           gm: gm,
           cogs: cogs_new,
           sku_description: sku_description,
+          new_rsp_per_case:newRSPPerCase,
         });
 
         try {
@@ -440,6 +436,7 @@
               newBD,
               newCPP,
               pcs,
+              new_rsp_per_case:newRSPPerCase,
             }),
           });
 

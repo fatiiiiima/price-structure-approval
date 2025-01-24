@@ -231,7 +231,7 @@ def get_sku_data(sku_number, country):
         if row_per_ton:
             case_per_ton = row_per_ton[0]
             print(case_per_ton)
-            result["case_per_ton"] = row_per_ton[0]
+            result["case_per_ton"] = round(row_per_ton[0], 0)
         
         
         query_rate = """
@@ -247,11 +247,11 @@ def get_sku_data(sku_number, country):
             result["currency_rate"] = row_currency[0]
             
             if total_cogs_usd and currency_rate:
-                total_cogs_local = round(total_cogs_usd * currency_rate)  # Convert to local currency and round
+                total_cogs_local = round(total_cogs_usd * currency_rate,0)  # Convert to local currency and round
                 result["total_cogs_local"] = total_cogs_local
                 
                 if case_per_ton and total_cogs_local:
-                    cogs_per_case = round(total_cogs_local / case_per_ton)
+                    cogs_per_case = round(total_cogs_local / case_per_ton,0)
                     result["cogs_per_case"] = cogs_per_case
                 
         
@@ -539,7 +539,8 @@ def calculate_results():
             "dm":new_dm,
             "clearingcharges":new_cc,
             "bd":new_bd,
-            "cpp":new_cpp
+            "cpp":new_cpp,
+            "newRSPPerCase":rsp_per_case,
         })
 
     except Exception as e:
@@ -630,6 +631,7 @@ def submit_request():
     bd = data["newBD"]
     cpp = data["newCPP"]
     pcs = data["pcs"]
+    rsp_per_case = data["new_rsp_per_case"]
     
 
     
@@ -695,14 +697,14 @@ def submit_request():
         (sku_code, country, requester_id, current_approver_id, approver_name, rsp, 
          tts_percentage, status, bptt, cif, gsv, too, gp, gm, cogs, 
          requester_name, approval_type, next_approver_id, request_id, sku_description,
-         vat, rm, wsm, dm, duty, [clearingcharges], bd, cpp, pieces_per_case)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+         vat, rm, wsm, dm, duty, [clearingcharges], bd, cpp, pieces_per_case, [RSP/Cs_LC])
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?)
     """,
     (
         sku_code, country, current_user.id, finance[0], finance[1], rsp, tts_percentage,
         'Pending', bptt_new, cif_new, gsv_new, to_new, gp_new, gm_new, cogs_new,
         current_user.username, 'TTS', cd_manager_id, request_id, sku_description, 
-        vat, rm, wsm, dm, duty, cc, bd, cpp, pcs,
+        vat, rm, wsm, dm, duty, cc, bd, cpp, pcs, rsp_per_case
     )
 )
 
@@ -1503,14 +1505,14 @@ def final_approval():
     """, current_user.id, request_id_code, request_id, current_user.id)
     
     cursor.execute("""
-        SELECT country, sku_code, tts_percentage, bptt, cif 
+        SELECT country, sku_code, tts_percentage, bptt, cif, [RSP/Cs_LC]
         FROM ApprovalRequestsWithDetails 
         WHERE id = ?
     """, request_id)
     request_details = cursor.fetchone()
     
     if request_details:
-        country, sku_code, tts_percentage, bptt, cif = request_details
+        country, sku_code, tts_percentage, bptt, cif, rsp_per_case = request_details
         tts_percentage = tts_percentage / 100
         cursor.execute("""
             UPDATE SKU_tts 
@@ -1521,44 +1523,44 @@ def final_approval():
         if country == 'Qatar':
             cursor.execute("""
             UPDATE [Qatar_PS_New]
-            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
+            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?, [RSP/Cs_LC] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif, sku_code)
+            """, bptt, cif, rsp_per_case, sku_code)
         
         elif country == 'Kuwait':
             cursor.execute("""
             UPDATE [Kuwait_PS_New]
-            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
+            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?, [RSP/Cs_LC] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif, sku_code)
+            """, bptt, cif, rsp_per_case, sku_code)
             
         elif country == 'KSA':
             cursor.execute("""
             UPDATE [KSA_PS_New]
-            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
+            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?, [RSP/Cs_LC] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif, sku_code)
+            """, bptt, cif, rsp_per_case, sku_code)
             
         elif country == 'UAE':
             cursor.execute("""
             UPDATE [UAE_PS_New]
-            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
+            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?, [RSP/Cs_LC] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif, sku_code)
+            """, bptt, cif, rsp_per_case, sku_code)
         
         elif country == 'Oman':
             cursor.execute("""
             UPDATE [Oman_PS_New]
-            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
+            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?, [RSP/Cs_LC] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif, sku_code)
+            """, bptt, cif, rsp_per_case, sku_code)
             
         elif country == 'Bahrain':
             cursor.execute("""
             UPDATE [Bahrain_PS_New]
-            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?
+            SET [BPTT LC/Case] = ?, [CIF LC/case] = ?, [RSP/Cs_LC] = ?
             WHERE [SKU Code] = ?
-            """, bptt, cif, sku_code)
+            """, bptt, cif, rsp_per_case, sku_code)
             
         
         
@@ -1755,8 +1757,8 @@ def export_sap_template():
 @app.route("/export_pdf_file", methods=["GET"])
 @login_required
 def export_pdf_file():
-    if current_user.role != 'admin':
-        return "Unauthorized", 403
+    # if current_user.role != 'admin' or 'cdmanager' or 'manager':
+    #     return "Unauthorized", 403
     
     unique_id = request.args.get("unique_id")
     if not unique_id:
@@ -1766,7 +1768,7 @@ def export_pdf_file():
     cursor = conn.cursor()
     
     cursor.execute("""
-            SELECT sku_code, country, updated_at, rsp, cif, bptt
+            SELECT sku_code, country, updated_at, rsp, cif, bptt, [RSP/Cs_LC]
             FROM ApprovalRequestsWithDetails
             WHERE id = ?
     """, unique_id)
@@ -1776,11 +1778,11 @@ def export_pdf_file():
     if not result:
         return jsonify({"error": "No data found for the given unique_id"}), 404
     
-    sku_code, country, updated_At, rsp, cif, bptt = result
+    sku_code, country, updated_At, rsp, cif, bptt, rsp_per_case = result
     
     if country == 'Qatar':
         cursor.execute("""
-        SELECT [Enitity], [SKU Description], [DB SKU], [VAT %], [VAT], [RM %], [RSP/Cs_LC], [Retail Markup LC] ,[Retail Price LC],[WSM %], [W/Sale Markup LC], [DM %] ,[Distributor Markup LC],[DPLC LC/case]
+        SELECT [Enitity], [SKU Description], [DB SKU], [VAT %], [VAT], [RM %], [Retail Markup LC] ,[Retail Price LC],[WSM %], [W/Sale Markup LC], [DM %] ,[Distributor Markup LC],[DPLC LC/case]
         ,[Duty %]
         ,[Duty]
         ,[Clearing Charges %]
@@ -1791,7 +1793,7 @@ def export_pdf_file():
     
     field_values = cursor.fetchone()
     
-    entity, desc, db_sku, vat_per, vat, rm_per, rsp_lc, retail_markup_lc, retail_price, wsm_per, w_sale, dm_per, distributor_markup, dplc, duty_per, duty, cc_per, cc = field_values
+    entity, desc, db_sku, vat_per, vat, rm_per, retail_markup_lc, retail_price, wsm_per, w_sale, dm_per, distributor_markup, dplc, duty_per, duty, cc_per, cc = field_values
 
     # Format percentage values as strings with percentage sign
     vat_per = f"{vat_per * 100:.0f}%" if vat_per is not None else None
@@ -1802,7 +1804,7 @@ def export_pdf_file():
     cc_per = f"{cc_per * 100:.0f}%" if cc_per is not None else None
 
     # Round numerical values with decimals to two places
-    variables = [rsp_lc, rm_per, retail_markup_lc, retail_price, wsm_per, w_sale,
+    variables = [rsp_per_case, rm_per, retail_markup_lc, retail_price, wsm_per, w_sale,
                  dm_per, distributor_markup, dplc, duty_per, duty, cc_per, cc]
 
 # Replace None values with 0 or another default value before rounding
@@ -1824,7 +1826,7 @@ def export_pdf_file():
     
     
     if country == 'Qatar':
-        currency = 'QAR'
+        
         query_qatar = """
         SELECT [Pack_Type]
         FROM SKU_Master$ExternalData_2
@@ -1835,8 +1837,11 @@ def export_pdf_file():
         if enitity_qatar:
             if enitity_qatar[0] =='Tea Bags':
                 sales_organization = 5800
+                currency = 'USD'
             else:
                 sales_organization = 3330
+                currency = 'QAR'
+                
         
     elif country in ['KSA', 'Oman', 'Bahrain']:
         currency = 'USD'
@@ -1848,6 +1853,7 @@ def export_pdf_file():
         
     elif country == 'UAE':
         sales_organization = 3300
+        currency = 'USD'
         
     
     
@@ -1868,35 +1874,39 @@ def export_pdf_file():
         "finance_member": "Kunal Thakwani",
         "table_data": [
             [ 
-                sku_code,
-                db_sku, 
-                desc,
-                0, 
-                vat_per, 
-                vat, 
-                rsp,
-                rsp_lc,
-                rm_per, 
-                retail_markup_lc, 
-                retail_price, 
-                wsm_per,
-                w_sale, 
-                bptt, 
-                dm_per, 
-                distributor_markup, 
-                dplc, 
-                duty_per,
-                duty, 
-                cc_per, 
-                cc, 
-                cif
+                sku_code, #0
+                db_sku,  #1
+                desc,#2
+                0,  #3
+                vat_per,  #4
+                vat, #5
+                rsp,#6
+                rsp_per_case, #7
+                rm_per, #8
+                retail_markup_lc, #9
+                retail_price, #10
+                wsm_per,#11
+                w_sale, #12
+                bptt, #13
+                dm_per, #14
+                distributor_markup, #15
+                dplc, #16
+                duty_per, #17
+                duty, #18
+                cc_per, #19
+                cc, #20
+                cif #21
             ]
         ]
     }
     
     output_file = generate_price_structure_pdf(data) 
     
-    return send_file(output_file, as_attachment=True)
+    if current_user.role == 'admin':
+        return send_file(output_file, as_attachment=True)
+    
+    else:
+        return send_file(output_file, as_attachment=False)
 
 
    
