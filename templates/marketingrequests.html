@@ -122,22 +122,77 @@
         }
 
         try {
-          const response = await fetch("/change_rsp", {
+          const response = await fetch(`/calculate_new_rsp_results`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
               request_id: currentRequestId,
               new_rsp: newRSP,
             }),
           });
-
-          if (response.ok) {
-            alert("New RSP submitted and sent to the next approver.");
-            $("#changeRSPModal").modal("hide");
-            loadApprovals();
-          } else {
-            alert("Failed to submit new RSP.");
+          if (!response.ok) {
+            const errorData = await response.json();
+            alert(`Failed to calculate results: ${errorData.error}`);
+            return;
           }
+          const data = await response.json();
+          const { updated_values } = data;
+          const confirmChange = confirm(`
+      New Calculations:
+      - New GM: ${updated_values.new_gm} %
+
+      Do you want to proceed with this change?
+    `);
+
+          if (confirmChange) {
+            // Proceed with updating the TTS value
+            const updateResponse = await fetch(`/change_rsp`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                request_id: currentRequestId,
+                new_rsp: newRSP,
+                new_bptt:updated_values.new_bptt, 
+                new_cif: updated_values.new_cif,
+                new_gsv: updated_values.new_gsv,
+                new_to:updated_values.new_to,
+                new_gp:updated_values.new_gp, 
+                new_gm:updated_values.new_gm,
+              }),
+            });
+
+            if (updateResponse.ok) {
+              alert("RSP updated successfully!");
+              $("#changeRSPModal").modal("hide");
+              loadApprovals(); // Refresh the approvals list
+            } else {
+              const errorData = await updateResponse.json();
+              alert(`Failed to update RSP: ${errorData.error}`);
+            }
+          }
+        // } catch (error) {}
+
+        // try {
+        //   const response = await fetch("/change_rsp", {
+        //     method: "POST",
+        //     headers: { "Content-Type": "application/json" },
+        //     body: JSON.stringify({
+        //       request_id: currentRequestId,
+        //       new_rsp: newRSP,
+        //     }),
+        //   });
+
+        //   if (response.ok) {
+        //     alert("New RSP submitted and sent to the next approver.");
+        //     $("#changeRSPModal").modal("hide");
+        //     loadApprovals();
+        //   } else {
+        //     alert("Failed to submit new RSP.");
+        //   }
         } catch (error) {
           console.error("Error submitting new RSP:", error);
         }
@@ -189,7 +244,7 @@
             </button>
           </div>
           <div class="modal-body">
-            <label for="newRSPValue">New RSP:</label>
+            <label for="newRSPValue">New RSP (per piece):</label>
             <input
               type="number"
               id="newRSPValue"

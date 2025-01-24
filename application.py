@@ -602,6 +602,76 @@ def calculate_new_results():
         return jsonify({"error": "Failed to calculate new results"}), 500
 
 
+@app.route('/calculate_new_rsp_results', methods=['POST'])
+@login_required
+def calculate_new_rsp_results():
+    try:
+        data = request.get_json()
+        request_id = data.get('request_id')
+        new_rsp = data.get('new_rsp')
+
+        if not request_id or new_rsp is None:
+            return jsonify({"error": "Missing request_id or new_rsp value"}), 400
+
+        # Connect to the database
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+
+        # Fetch the record based on the request_id
+        cursor.execute("SELECT * FROM ApprovalRequestsWithDetails WHERE id = ?", request_id)
+        record = cursor.fetchone()
+
+        if not record:
+            return jsonify({"error": "Record not found"}), 404
+
+        # Explicitly convert Decimal values to float
+        cogs = float(record.cogs)
+        tts_per = float(record.tts_percentage) / 100
+        vat = float(record.vat)
+        pieces_per_case = float(record.pieces_per_case)
+        rm = float(record.rm)
+        wsm = float(record.wsm)
+        dm = float(record.dm)
+        duty = float(record.duty)
+        clearing_charges = float(record.clearingcharges)
+        bd = float(record.bd)
+        cpp = float(record.cpp)
+
+        # Perform calculations
+        new_rsp_without_vat = new_rsp / (1 + vat)
+        new_rsp_per_case = new_rsp_without_vat * pieces_per_case
+        new_retail_markup = new_rsp_per_case / (1 + rm)
+        new_bptt = new_retail_markup / (1 + wsm)
+        new_dplc = new_bptt / (1 + dm)
+        new_cif = (new_dplc / (1 + duty + clearing_charges)) - bd
+        new_gsv = new_cif / (1 + cpp)
+
+        new_tts_value = round(tts_per * new_gsv, 2)
+        new_to_value = round(new_gsv - new_tts_value, 2)
+        new_gp_value = round(new_to_value - cogs, 2)
+        new_gm_value = round((new_gp_value / new_to_value) * 100, 2)  # Convert to percentage
+
+        # Prepare updated values
+        updated_values = {
+            "new_bptt": new_bptt,
+            "new_cif":new_cif,
+            "new_gsv":new_gsv,
+            "new_tts": new_tts_value,
+            "new_to": new_to_value,
+            "new_gp": new_gp_value,
+            "new_gm": new_gm_value,  # Already in percentage form
+        }
+
+        conn.close()
+
+        return jsonify({"success": True, "updated_values": updated_values}), 200
+
+    except Exception as e:
+        print("Error calculating new results:", e)
+        return jsonify({"error": "Failed to calculate new results"}), 500
+
+
+
 @app.route('/submit_request', methods=['POST'])
 @login_required
 def submit_request():
@@ -811,6 +881,12 @@ def change_tts():
     data = request.get_json()
     request_id = data['request_id']
     new_tts = data['new_tts']
+    new_to = data['new_to']
+    new_gp = data['new_gp']
+    new_gm = data['new_gm']
+
+
+    
 
     if new_tts > 100:
         return jsonify({"error": "TTS percentage cannot exceed 100"}), 400
@@ -835,12 +911,15 @@ def change_tts():
     cursor.execute("""
         UPDATE ApprovalRequestsWithDetails
         SET tts_percentage = ?, 
+            too = ?,
+            gp = ?,
+            gm = ?, 
             status = 'Updated TTS%', 
             approval_type= 'TTS Updated',
             current_approver_id = ?, 
             updated_at = GETDATE()
         WHERE id = ?
-    """, new_tts, requester_id, request_id)
+    """, new_tts, new_to, new_gp, new_gm, requester_id, request_id)
 
     conn.commit()
     conn.close()
@@ -883,13 +962,22 @@ def change_rsp():
     data = request.json
     request_id = data.get('request_id')
     new_rsp = data.get('new_rsp')
+    new_bptt = data.get('new_bptt')
+    new_cif = data.get('new_cif')
+    new_gsv = data.get('new_gsv')
+    new_to = data.get('new_to')
+    new_gp = data.get('new_gp')
+    new_gm = data.get('new_gm')
+
 
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
     try:
         cursor.execute("""
             UPDATE ApprovalRequestsWithDetails
-            SET rsp = ?, status = 'TTS Approved', 
+            SET rsp = ?, bptt = ?, cif = ?, gsv = ?,
+            too = ?, gp = ?, gm = ?,
+            status = 'TTS Approved', 
             updated_at = GETDATE(), 
             approval_type = 'CD Manager Approval', 
             approver_name = (
@@ -900,7 +988,7 @@ def change_rsp():
             SELECT id FROM users WHERE role = 'manager'
             )
             WHERE id = ?
-        """, new_rsp, current_user.id, request_id)
+        """, new_rsp, new_bptt, new_cif, new_gsv, new_to, new_gp, new_gm, current_user.id, request_id)
         conn.commit()
         return jsonify({"message": "RSP updated"}), 200
     except Exception as e:
