@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, jsonify, session
+from flask import Flask, request, render_template, redirect, url_for, jsonify, session,  Response
 import pyodbc
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import bcrypt
@@ -686,8 +686,7 @@ def submit_request():
     if existing_request:
         existing_id, existing_status = existing_request
         # Update the status of the existing request to INACTIVE
-        cursor.execute("""UPDATE ApprovalRequestsWithDetails 
-                          SET status = 'INACTIVE', current_approver_id = NULL 
+        cursor.execute("""DELETE FROM ApprovalRequestsWithDetails  
                           WHERE id = ?""", existing_id)
 
     # Insert the new request for TTS approval
@@ -3541,9 +3540,70 @@ def upload_cd_excel():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
 
 
-        
 
-if __name__ == "__main__":
+@app.route("/download_excel_file/<country>", methods=['GET'])
+@login_required
+def download_file(country):
+    if current_user.role != 'admin':
+        return "Unauthorized", 403 
+    
+    allowed_countries = ["Qatar_PS_New", "Bahrain_PS_New", "Oman_PS_New", "Kuwait_PS_New", "KSA_PS_New", "UAE_PS_New"]
+    
+    if country not in allowed_countries:
+        return "Invalid country", 400
+    
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
+    
+    # Manually build the query string with the validated table name
+    query = f"""
+        SELECT TOP (1000) [DD code],
+        [Enitity], [SKU Code], [Comments], [DB SKU], [CPD code],
+        [SKU Description], [Brand], [Sector], [Flavor], [Format],
+        [Packing], [Project], [Type], [SU], [Cases/Ton], [Units/Cs],
+        [Valid from], [Valid to], [Proposed RSP (inc VAT) LC], [VAT %],
+        [VAT], [Proposed RSP (ex VAT) LC], [RSP/Cs_LC], [RM %],
+        [Retail Markup LC], [Retail Price LC], [WSM %],
+        [W/Sale Markup LC], [BPTT LC/Case], [DM %], [Distributor Markup LC],
+        [DPLC LC/case], [Duty %], [Duty], [Clearing Charges %],
+        [Clearing Charges], [BD], [CIF LC/case], [CPP%], [CPP],
+        [GSV LC/case], [F43], [Stock], [Z521 SAP], [F46], [F47],
+        [BPTT $/Case], [CIF $/Case], [BPTT $/Ton], [CIF $/Ton],
+        [GSV/Ton $], [BPTT LC/Piece], [Check], [Z009], [Z521], [Z000]
+        FROM {country}
+    """
+    
+    try:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        columns = [column[0] for column in cursor.description]
+    except Exception as e:
+        return f"Error executing query: {str(e)}", 500
+    finally:
+        conn.close()
+    
+    # Convert results to a DataFrame
+    df = pd.DataFrame.from_records(rows, columns=columns)
+    
+    # Export to an in-memory Excel file
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Sheet1")
+    output.seek(0)
+    
+    # Send the file as a response
+    return send_file(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"{country}.xlsx",
+    )
+
+
+
+
+if __name__ == '__main__':
     app.run(debug=True)

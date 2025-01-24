@@ -11,7 +11,7 @@ def generate_price_structure_pdf(data):
     with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
         output_file = temp_file.name
 
-    pdf = SimpleDocTemplate(output_file, pagesize=landscape(letter))
+    pdf = SimpleDocTemplate(output_file, pagesize=letter)
     elements = []
 
     # Styles
@@ -19,9 +19,10 @@ def generate_price_structure_pdf(data):
     title_style = styles['Title']
     normal_style = styles['Normal']
     wrap_style = styles['Normal']
-    wrap_style.fontSize = 8  # Adjust font size for readability
-    wrap_style.leading = 10  # Line spacing for wrapped text
-
+    wrap_style.fontSize = 6  # Adjust font size for readability
+    wrap_style.leading = 8  # Line spacing for wrapped text
+    
+    
     # Add title
     elements.append(Paragraph("Price Communication to Distributor – Price Structure", title_style))
     elements.append(Spacer(1, 0.2 * inch))
@@ -38,13 +39,13 @@ def generate_price_structure_pdf(data):
         ["Lipton Finance Member", data["finance_member"]],
     ]
 
-    details_table = Table(basic_details, colWidths=[2 * inch, 4 * inch])
+    details_table = Table(basic_details, colWidths=[1.5 * inch, 3.5 * inch])
     details_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -110,16 +111,19 @@ def generate_price_structure_pdf(data):
         ])
 
     # Create the table
-    structured_table = Table(table_data, colWidths=[2 * inch, 3 * inch, 2 * inch])
+    structured_table = Table(table_data, colWidths=[1.5 * inch, 2.5 * inch, 1.5* inch])
     structured_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
+    
+    logo_path = "lipton_logo.png"  
+    elements.insert(0, Image(logo_path, width=2 * inch, height=1 * inch))
 
     elements.append(structured_table)
 

@@ -70,7 +70,7 @@
         background-color: #0056b3;
       }
 
-      .close-button {
+      .form-container .close-button {
         background-color: #ff4d4d;
         color: white;
         border: none;
@@ -82,9 +82,10 @@
         top: 10px;
         right: 10px;
         transition: background-color 0.3s;
+        width: 15%;
       }
 
-      .close-button:hover {
+      .form-container .close-button:hover {
         background-color: #cc0000;
       }
 
@@ -118,6 +119,42 @@
 
     <div class="button-container">
       <button id="upload-excel-cd-button">Upload CD Manager File</button>
+    </div>
+
+    <div class="button-container">
+      <button id="download-qatar-button">
+        Download Qatar Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="download-bahrain-button">
+        Download Bahrain Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="download-kuwait-button">
+        Download Kuwait Price Structure File
+      </button>
+    </div>
+
+    <div class="button-container">
+      <button id="download-ksa-button">
+        Download KSA Price Structure File
+      </button>
+    </div>
+
+    
+    <div class="button-container">
+      <button id="download-oman-button">
+        Download Oman Price Structure File
+      </button>
+    </div>
+    <div class="button-container">
+      <button id="download-uae-button">
+        Download UAE Price Structure File
+      </button>
     </div>
 
     <div class="button-container">
@@ -159,13 +196,11 @@
     <!-- <a href="{{ url_for('back_admin_dashboard') }}">Dashboard</a> -->
 
     <div class="button-container">
-      <button id="back-button">
-        Back to Dashboard
-      </button>
+      <button id="back-button">Back to Dashboard</button>
     </div>
 
     <div class="form-container" id="currency-form-container">
-      <button id="close-currency-form">X</button>
+      <button class="close-button" id="close-currency-form">X</button>
       <h2>Update Currency Rates</h2>
       <form id="update-currency-form">
         <label for="country">Select Country:</label>
@@ -185,7 +220,7 @@
           id="toUSD"
           name="toUSD"
           step="0.0001"
-          placeholder="Enter rate (e.g., 3.75)"
+          placeholder="Enter rate (e.g., 3.7509)"
           required
         />
 
@@ -589,14 +624,75 @@
         fileInput.click();
       });
 
-      const uploadBackButton = document.getElementById(
-        "back-button"
-      );
+
+      const downloadExcelFile = (country) => {
+        fetch(`/download_excel_file/${country}`, {
+          method: "GET",
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Failed to download file.");
+            }
+            return response.blob();
+          })
+          .then((blob) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${country}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          })
+          .catch((error) => {
+            console.error("Error downloading file:", error);
+            alert("Failed to download file. Please try again later.");
+          });
+      };
+
+      // Example: Add event listeners for buttons
+      document
+        .getElementById("download-qatar-button")
+        .addEventListener("click", () => {
+          downloadExcelFile("Qatar_PS_New");
+        });
+
+      document
+        .getElementById("download-bahrain-button")
+        .addEventListener("click", () => {
+          downloadExcelFile("Bahrain_PS_New");
+        });
+
+        document
+        .getElementById("download-kuwait-button")
+        .addEventListener("click", () => {
+          downloadExcelFile("Kuwait_PS_New");
+        });
+
+      document
+        .getElementById("download-ksa-button")
+        .addEventListener("click", () => {
+          downloadExcelFile("KSA_PS_New");
+        });
+
+        document
+        .getElementById("download-oman-button")
+        .addEventListener("click", () => {
+          downloadExcelFile("Oman_PS_New");
+        });
+
+      document
+        .getElementById("download-uae-button")
+        .addEventListener("click", () => {
+          downloadExcelFile("UAE_PS_New");
+        });
+
+
+      const uploadBackButton = document.getElementById("back-button");
 
       uploadBackButton.addEventListener("click", () => {
         window.location.href = "dashboard";
       });
-
     </script>
   </body>
 </html>
