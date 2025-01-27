@@ -1844,156 +1844,145 @@ def export_sap_template():
 @app.route("/export_pdf_file", methods=["GET"])
 @login_required
 def export_pdf_file():
-    # if current_user.role != 'admin' or 'cdmanager' or 'manager':
-    #     return "Unauthorized", 403
-    
     unique_id = request.args.get("unique_id")
     if not unique_id:
         return jsonify({"error": "Missing unique_id parameter"}), 400
     
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
+    try:
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+
+        # Fetch primary record
+        cursor.execute("""
             SELECT sku_code, country, updated_at, rsp, cif, bptt, [RSP/Cs_LC]
             FROM ApprovalRequestsWithDetails
             WHERE id = ?
-    """, unique_id)
-    
-    result = cursor.fetchone()
-    
-    if not result:
-        return jsonify({"error": "No data found for the given unique_id"}), 404
-    
-    sku_code, country, updated_At, rsp, cif, bptt, rsp_per_case = result
-    
-    if country == 'Qatar':
+        """, unique_id)
+        result = cursor.fetchone()
+
+        if not result:
+            return jsonify({"error": "No data found for the given unique_id"}), 404
+
+        sku_code, country, updated_at, rsp, cif, bptt, rsp_per_case = result
+
+        # Fetch distributor
         cursor.execute("""
-        SELECT [Enitity], [SKU Description], [DB SKU], [VAT %], [VAT], [RM %], [Retail Markup LC] ,[Retail Price LC],[WSM %], [W/Sale Markup LC], [DM %] ,[Distributor Markup LC],[DPLC LC/case]
-        ,[Duty %]
-        ,[Duty]
-        ,[Clearing Charges %]
-        ,[Clearing Charges]
-        FROM Qatar_PS_New
-        WHERE [SKU Code] = ?
+            SELECT DB_Manager
+            FROM CountryDetails
+            WHERE Country = ?
+        """, country)
+        distributor = cursor.fetchone()
+        distributor_name = distributor[0] if distributor else "Unknown Distributor"
+
+        # Country-specific table mappings
+        country_table_mapping = {
+            "Qatar": "Qatar_PS_New",
+            "Kuwait": "Kuwait_PS_New",
+            "KSA": "KSA_PS_New",
+            "Bahrain": "Bahrain_PS_New",
+            "Oman": "Oman_PS_New",
+            "UAE": "UAE_PS_New",
+        }
+
+        if country not in country_table_mapping:
+            return jsonify({"error": f"No pricing data available for {country}"}), 400
+
+        # Fetch country-specific data
+        table_name = country_table_mapping[country]
+        cursor.execute(f"""
+            SELECT [Enitity], [SKU Description], [DB SKU], [VAT %], [VAT], [RM %], 
+                   [Retail Markup LC], [Retail Price LC], [WSM %], [W/Sale Markup LC], 
+                   [DM %], [Distributor Markup LC], [DPLC LC/case], [Duty %], [Duty], 
+                   [Clearing Charges %], [Clearing Charges]
+            FROM {table_name}
+            WHERE [SKU Code] = ?
         """, sku_code)
-    
-    field_values = cursor.fetchone()
-    
-    entity, desc, db_sku, vat_per, vat, rm_per, retail_markup_lc, retail_price, wsm_per, w_sale, dm_per, distributor_markup, dplc, duty_per, duty, cc_per, cc = field_values
+        field_values = cursor.fetchone()
 
-    # Format percentage values as strings with percentage sign
-    vat_per = f"{vat_per * 100:.0f}%" if vat_per is not None else None
-    rm_per = f"{rm_per * 100:.0f}%" if rm_per is not None else None
-    wsm_per = f"{wsm_per * 100:.0f}%" if wsm_per is not None else None
-    dm_per = f"{dm_per * 100:.0f}%" if dm_per is not None else None
-    duty_per = f"{duty_per * 100:.0f}%" if duty_per is not None else None
-    cc_per = f"{cc_per * 100:.0f}%" if cc_per is not None else None
+        if not field_values:
+            return jsonify({"error": "No data found for the given SKU code"}), 404
 
-    # Round numerical values with decimals to two places
-    variables = [rsp_per_case, rm_per, retail_markup_lc, retail_price, wsm_per, w_sale,
-                 dm_per, distributor_markup, dplc, duty_per, duty, cc_per, cc]
+        # Unpack the values
+        (entity, desc, db_sku, vat_per, vat, rm_per, retail_markup_lc, retail_price, 
+         wsm_per, w_sale, dm_per, distributor_markup, dplc, duty_per, duty, cc_per, cc) = field_values
 
-# Replace None values with 0 or another default value before rounding
-    rounded_values = [
-    v if isinstance(v, str) or v is None else round(v, 2) for v in variables
-        ]
+        # Handle country-specific logic
+        currency = "USD"
+        sales_organization = 3330  # Default value
 
-    rsp_lc, rm_per, retail_markup_lc, retail_price, wsm_per, w_sale, dm_per, \
-    distributor_markup, dplc, duty_per, duty, cc_per, cc = rounded_values
-    
-    cursor.execute("""
-                 SELECT name FROM users WHERE role = 'manager'
-        """)
-    finance_manager = cursor.fetchone()
-    
-    formatted_date = updated_At.strftime("%Y-%m-%d")
-    
-    
-    
-    
-    if country == 'Qatar':
-        
-        query_qatar = """
-        SELECT [Pack_Type]
-        FROM SKU_Master$ExternalData_2
-        WHERE [Material_Code] = ?
-        """
-        cursor.execute(query_qatar, (sku_code,))
-        enitity_qatar = cursor.fetchone()
-        if enitity_qatar:
-            if enitity_qatar[0] =='Tea Bags':
+        if country == "Qatar":
+            # Determine currency and sales organization based on pack type
+            cursor.execute("""
+                SELECT [Pack_Type]
+                FROM SKU_Master$ExternalData_2
+                WHERE [Material_Code] = ?
+            """, sku_code)
+            pack_type = cursor.fetchone()
+            if pack_type and pack_type[0] == "Tea Bags":
                 sales_organization = 5800
-                currency = 'USD'
+                currency = "USD"
             else:
-                sales_organization = 3330
-                currency = 'QAR'
-                
+                currency = "QAR"
+
+        elif country == "Kuwait":
+            currency = "KWD"
         
-    elif country in ['KSA', 'Oman', 'Bahrain']:
-        currency = 'USD'
-        sales_organization = 3330
-        
-    elif country == 'Kuwait':
-        currency = 'KWD'
-        sales_organization = 3330
-        
-    elif country == 'UAE':
-        sales_organization = 3300
-        currency = 'USD'
-        
-    
-    
-    entity_int = int(entity)
-    entity_string = str(entity_int)
-    
-    full_string = entity_string + currency
-    full_string2 = entity_string + "Ekaterra Gulf FZE (Free zone entity)"
-    
-    data = {
-        "date_of_communication": formatted_date, 
-        "distributor": "",
-        "country": country, 
-        "effective_date_from": formatted_date,
-        "effective_date_till": "Till next communication of Price update", 
-        "invoicing_currency": currency , 
-        "invoicing_entity": sales_organization,
-        "finance_member": "Kunal Thakwani",
-        "table_data": [
-            [ 
-                sku_code, #0
-                db_sku,  #1
-                desc,#2
-                0,  #3
-                vat_per,  #4
-                vat, #5
-                rsp,#6
-                rsp_per_case, #7
-                rm_per, #8
-                retail_markup_lc, #9
-                retail_price, #10
-                wsm_per,#11
-                w_sale, #12
-                bptt, #13
-                dm_per, #14
-                distributor_markup, #15
-                dplc, #16
-                duty_per, #17
-                duty, #18
-                cc_per, #19
-                cc, #20
-                cif #21
-            ]
+        elif country == "UAE":
+            sales_organization = 3300
+
+        # Format percentages and round values
+        def format_percent(value):
+            return f"{value * 100:.0f}%" if value is not None else None
+
+        formatted_values = {
+            "vat_per": format_percent(vat_per),
+            "rm_per": format_percent(rm_per),
+            "wsm_per": format_percent(wsm_per),
+            "dm_per": format_percent(dm_per),
+            "duty_per": format_percent(duty_per),
+            "cc_per": format_percent(cc_per),
+        }
+
+        rounded_values = [
+            round(v, 2) if isinstance(v, (int, float)) else v
+            for v in [rsp_per_case, rm_per, retail_markup_lc, retail_price, wsm_per, 
+                      w_sale, dm_per, distributor_markup, dplc, duty, cc]
         ]
-    }
-    
-    output_file = generate_price_structure_pdf(data) 
-    
-    if current_user.role == 'admin':
-        return send_file(output_file, as_attachment=True)
-    
-    else:
-        return send_file(output_file, as_attachment=False)
+
+        # Unpack rounded values
+        rsp_lc, rm_per, retail_markup_lc, retail_price, wsm_per, w_sale, dm_per, \
+        distributor_markup, dplc, duty, cc = rounded_values
+
+        # Prepare the final data structure
+        formatted_date = updated_at.strftime("%Y-%m-%d")
+        data = {
+            "date_of_communication": formatted_date,
+            "distributor": distributor_name,
+            "country": country,
+            "effective_date_from": formatted_date,
+            "effective_date_till": "Till next communication of Price update",
+            "invoicing_currency": currency,
+            "invoicing_entity": sales_organization,
+            "finance_member": "Kunal Thakwani",
+            "table_data": [
+                [
+                    sku_code, db_sku, desc, 0, formatted_values["vat_per"], vat, rsp, rsp_per_case,
+                    formatted_values["rm_per"], retail_markup_lc, retail_price, formatted_values["wsm_per"],
+                    w_sale, bptt, formatted_values["dm_per"], distributor_markup, dplc, 
+                    formatted_values["duty_per"], duty, formatted_values["cc_per"], cc, cif
+                ]
+            ]
+        }
+
+        # Generate and send the PDF
+        output_file = generate_price_structure_pdf(data)
+        return send_file(output_file, as_attachment=current_user.role == "admin")
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        conn.close()
 
 
    
