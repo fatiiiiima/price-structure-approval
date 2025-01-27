@@ -135,24 +135,31 @@ def index():
 
 def get_sku_data(sku_number, country):
     """
-    Fetch SKU data from the Master1 table based on SKU number and country.
-    Also fetch additional data from Qatar_PS, SKU_tts, and Sheet1$ tables.
+    Fetch SKU data from the SKU_tts table based on SKU number and country.
+    If the SKU doesn't exist for the given country, return a not-found message.
     """
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
 
-        # First query: Fetch from Master1
+        # Check if the SKU code exists for the given country
+        check_query = """
+        SELECT 1
+        FROM SKU_tts
+        WHERE [SKU Code] = ? AND Country = ?
+        """
+        cursor.execute(check_query, sku_number, country)
+        sku_exists = cursor.fetchone()
+
+        if not sku_exists:
+            conn.close()
+            return {"error": f"SKU Code {sku_number} not found for the country {country}"}
+
+        # Fetch data from the SKU_tts table
         query = """
         SELECT 
-            [SKU Description], Brand, Sector, Flavor, Format, Packing, Project, Type, [VAT%]
-      ,[RM %]
-      ,[WSM %]
-      ,[DM %]
-      ,[Duty %]
-      ,[Clearing Charges %]
-      ,[BD %]
-      ,[CPP%]
+            [SKU Description], Brand, Sector, Flavor, Format, Packing, Project, Type, [VAT%],
+            [RM %], [WSM %], [DM %], [Duty %], [Clearing Charges %], [BD %], [CPP%]
         FROM SKU_tts
         WHERE [SKU Code] = ? AND Country = ?
         """
@@ -172,211 +179,115 @@ def get_sku_data(sku_number, country):
                 "project": row[6],
                 "type": row[7],
                 "vat": round(row[8] * 100, 2),
-                "rm": round(row[9] *100, 2),
+                "rm": round(row[9] * 100, 2),
                 "wsm": round(row[10] * 100, 2),
                 "dm": round(row[11] * 100, 2),
-                "duty": round(row[12]* 100, 2),
-                "clearingcharges": round(row[13] * 100,2),
+                "duty": round(row[12] * 100, 2),
+                "clearingcharges": round(row[13] * 100, 2),
                 "bd": round(row[14] * 100, 2),
                 "cpp": round(row[15] * 100, 2),
             }
 
-        #Additional query: Fetch TTS% from SKU_tts table
+        # Fetch additional data (TTS%, Total COGS, PCS per case, Case per ton, etc.)
         query_tts = """
         SELECT [TTS%]
         FROM SKU_tts
         WHERE [SKU Code] = ? AND [Country] = ?
-
         """
         cursor.execute(query_tts, sku_number, country)
         row_tts = cursor.fetchone()
         if row_tts:
-            result["tts"] = row_tts[0]
-            result["tts"] = f"{round(float(result['tts']) * 100, 2)}%"
+            result["tts"] = f"{round(float(row_tts[0]) * 100, 2)}%"
 
-        # # Additional query: Fetch Total COGS from Sheet1$ table
         query_cogs = """
         SELECT [Total COGS]
         FROM [Sheet1$]
         WHERE [SKU Code] = ?
-
         """
         cursor.execute(query_cogs, sku_number)
         row_cogs = cursor.fetchone()
         if row_cogs:
             total_cogs_usd = round(row_cogs[0])
-            result["total_cogs_usd"] = round(row_cogs[0])
-            
+            result["total_cogs_usd"] = total_cogs_usd
+
         query_psc_per_case = """
         SELECT [PCS_per_Case]
         FROM [SKU_Master$ExternalData_2]
-        WHERE [Unique_SKU_Code] = ? 
+        WHERE [Unique_SKU_Code] = ?
         """
         cursor.execute(query_psc_per_case, sku_number)
         row_case = cursor.fetchone()
         if row_case:
-            #case per ton not pcs per case cogs per case / case per ton
             pcs_per_case = row_case[0]
-            result["pcs_per_case"] = row_case[0]
-        # Additional query for Qatar-specific data
+            result["pcs_per_case"] = pcs_per_case
 
         query_case_per_ton = """
         SELECT [Case_per_Ton]
         FROM [SKU_Master$ExternalData_2]
-        WHERE [Unique_SKU_Code] = ? 
+        WHERE [Unique_SKU_Code] = ?
         """
-        
         cursor.execute(query_case_per_ton, sku_number)
         row_per_ton = cursor.fetchone()
         if row_per_ton:
-            case_per_ton = row_per_ton[0]
-            print(case_per_ton)
-            result["case_per_ton"] = round(row_per_ton[0], 0)
-        
-        
+            case_per_ton = round(row_per_ton[0], 0)
+            result["case_per_ton"] = case_per_ton
+
         query_rate = """
         SELECT [toUSD]
         FROM CurrencyRates
         WHERE Country = ?
         """
         cursor.execute(query_rate, country)
-        
         row_currency = cursor.fetchone()
         if row_currency:
             currency_rate = row_currency[0]
-            result["currency_rate"] = row_currency[0]
-            
+            result["currency_rate"] = currency_rate
+
             if total_cogs_usd and currency_rate:
-                total_cogs_local = round(total_cogs_usd * currency_rate,0)  # Convert to local currency and round
+                total_cogs_local = round(total_cogs_usd * currency_rate, 0)
                 result["total_cogs_local"] = total_cogs_local
-                
+
                 if case_per_ton and total_cogs_local:
-                    cogs_per_case = round(total_cogs_local / case_per_ton,0)
+                    cogs_per_case = round(total_cogs_local / case_per_ton, 0)
                     result["cogs_per_case"] = cogs_per_case
-                
-        
-        if country == 'Qatar':
-            query_qatar = """
-            SELECT 
-                [Proposed RSP (inc VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
-            FROM Qatar_PS_New
-            WHERE [SKU Code] = ?
-            """
-            cursor.execute(query_qatar, sku_number)
-            row_qatar = cursor.fetchone()
-            if row_qatar:
-                result.update({
-                    "rsp": round(row_qatar[0], 2),
-                    "bptt": round(row_qatar[1],2),
-                    "cif": round(row_qatar[2],2),
-                    "rsppercase":round(row_qatar[3],2), 
-                    "currency":"QAR"
-                })
-        
-        elif country == 'Kuwait':
-            query_kuwait = """
-            SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
-            FROM Kuwait_PS_New
-            WHERE [SKU Code] = ?
-            """
-            cursor.execute(query_kuwait, sku_number)
-            row_kuwait = cursor.fetchone()
-            if row_kuwait:
-                result.update({
-                    "rsp": round(row_kuwait[0],2),
-                    "bptt": round(row_kuwait[1], 2),
-                    "cif": round(row_kuwait[2]),
-                    "rsppercase":round(row_kuwait[3],2),
-                    "currency":"KWD"
-                })
 
-        elif country == 'Oman':
-            query_oman = """
-            SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
-            FROM Oman_PS_New
-            WHERE [SKU Code] = ?
-            """
-            cursor.execute(query_oman, sku_number)
-            row_oman = cursor.fetchone()
-            if row_oman:
-                result.update({
-                    "rsp": round(row_oman[0],2),
-                    "bptt": round(row_oman[1],2),
-                    "cif": round(row_oman[2],2),
-                    "rsppercase":round(row_oman[3],2),
-                    "currency":"OMR"
-                })
+        # Fetch country-specific data
+        country_queries = {
+            "Qatar": ("Qatar_PS_New", "QAR"),
+            "Kuwait": ("Kuwait_PS_New", "KWD"),
+            "Oman": ("Oman_PS_New", "OMR"),
+            "Bahrain": ("Bahrain_PS_New", "BHD"),
+            "KSA": ("KSA_PS_New", "SAR"),
+            "UAE": ("UAE_PS_New", "AED"),
+        }
 
-        elif country == 'Bahrain':
-            query_bahrain = """
+        if country in country_queries:
+            table_name, currency = country_queries[country]
+            query_country = f"""
             SELECT 
                 [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
-            FROM Bahrain_PS_New
+            FROM {table_name}
             WHERE [SKU Code] = ?
             """
-            cursor.execute(query_bahrain, sku_number)
-            row_bahrain = cursor.fetchone()
-            if row_bahrain:
+            cursor.execute(query_country, sku_number)
+            row_country = cursor.fetchone()
+            if row_country:
                 result.update({
-                    "rsp": round(row_bahrain[0],2),
-                    "bptt": round(row_bahrain[1],2),
-                    "cif": round(row_bahrain[2],2),
-                    "rsppercase":round(row_bahrain[3],2),
-                    "currency":"BHD"
+                    "rsp": round(row_country[0], 2),
+                    "bptt": round(row_country[1], 2),
+                    "cif": round(row_country[2], 2),
+                    "rsppercase": round(row_country[3], 2),
+                    "currency": currency,
                 })
-
-        elif country == 'KSA':
-            query_ksa = """
-            SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
-            FROM KSA_PS_New
-            WHERE [SKU Code] = ?
-            """
-            cursor.execute(query_ksa, sku_number)
-            row_ksa = cursor.fetchone()
-            if row_ksa:
-                result.update({
-                    "rsp": round(row_ksa[0],2),
-                    "bptt": round(row_ksa[1]),
-                    "cif": round(row_ksa[2]),
-                    "rsppercase":round(row_ksa[3],2),
-                    "currency":"SAR"
-                })
-
-        elif country == 'UAE':
-            query_uae = """
-            SELECT 
-                [Proposed RSP (ex VAT) LC], [BPTT LC/Case], [CIF LC/case], [RSP/Cs_LC]
-            FROM UAE_PS_New
-            WHERE [SKU Code] = ?
-            """
-            cursor.execute(query_uae, sku_number)
-            row_uae = cursor.fetchone()
-            if row_uae:
-                result.update({
-                    "rsp": round(row_uae[0],2),
-                    "bptt": round(row_uae[1],2),
-                    "cif": round(row_uae[2],2),
-                    "rsppercase":round(row_uae[3],2),
-                    "currency":"AED"
-                })
-                
-                
-                    
-            
 
         # Close the connection
         conn.close()
-        
-        
-        
 
-        return result if result else None
+        return result
+
     except Exception as e:
         print("Database error:", e)
-        return None
+        return {"error": "An error occurred while fetching SKU data"}
 
 def hash_password(password):
     # Generate salt and hash
@@ -460,13 +371,20 @@ def get_sku_info():
     sku_number = data.get("sku_number")
     country = data.get("country")
 
-    # Fetch SKU information from database
+    if not sku_number or not country:
+        return jsonify({"error": "Both 'sku_number' and 'country' are required fields"}), 400
+
+    # Fetch SKU information from the database
     sku_info = get_sku_data(sku_number, country)
-    if sku_info:
-        sku_info["country"] = country  # Add country for context
-        return jsonify(sku_info), 200
-    else:
-        return jsonify({"error": f"SKU {sku_number} does not exist for {country}"}), 404
+    
+    # Check for error in the result
+    if "error" in sku_info:
+        return jsonify({"error": sku_info["error"]}), 404
+
+    # Add country for context
+    sku_info["country"] = country
+    return jsonify(sku_info), 200
+
     
 
 
