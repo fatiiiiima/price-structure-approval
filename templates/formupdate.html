@@ -18,6 +18,11 @@
     </style>
     <script>
       let currency = "";
+
+      function formatNumber(value) {
+        return value.toLocaleString(); // Formats the number based on the user's locale
+      }
+
       async function fetchSKUInfo(event) {
         event.preventDefault(); // Prevent form submission
 
@@ -125,11 +130,11 @@
           </div>
           <div class = "display-values">
           <p><strong>Total cogs per ton (in USD):</strong></p>
-          <p id="cogs_usd"> ${data.total_cogs_usd}</p>
+          <p id="cogs_usd"> ${formatNumber(data.total_cogs_usd)}</p>
           </div>
           <div class = "display-values">
           <p><strong>Total cogs per ton (in ${data.currency}):</strong></p>
-          <p id="cogs_local"> ${data.total_cogs_local}</p>
+          <p id="cogs_local"> ${formatNumber(data.total_cogs_local)}</p>
           </div>
           <div class = "display-values">
           <p><strong>TTS%:</strong></p>
@@ -339,7 +344,8 @@
         const newCIF = document.getElementById("new_cif").innerText;
         const newRSP = document.getElementById("new_rsp").innerText;
         console.log("new rsp", newRSP);
-        const newRSPPerCase = document.getElementById("new_rsp_per_case").innerText;
+        const newRSPPerCase =
+          document.getElementById("new_rsp_per_case").innerText;
         const newGSV = document.getElementById("gsv").innerText;
         const tts = document.getElementById("new_tts_percentage").innerText;
         console.log("new tts", tts);
@@ -405,7 +411,7 @@
           gm: gm,
           cogs: cogs_new,
           sku_description: sku_description,
-          new_rsp_per_case:newRSPPerCase,
+          new_rsp_per_case: newRSPPerCase,
         });
 
         try {
@@ -436,7 +442,7 @@
               newBD,
               newCPP,
               pcs,
-              new_rsp_per_case:newRSPPerCase,
+              new_rsp_per_case: newRSPPerCase,
             }),
           });
 

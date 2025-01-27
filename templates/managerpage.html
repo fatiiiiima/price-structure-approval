@@ -24,6 +24,14 @@
       .approval-header h5 {
         margin: 0;
       }
+      .logo-container {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+      }
+      .logo-container img {
+        width: 100px; /* Adjust the size as needed */
+      }
     </style>
     <script>
       // Function to load pending COGS approvals for Juanita
@@ -33,7 +41,9 @@
         approvalsContainer.innerHTML = "<p>Loading approvals...</p>";
 
         try {
-          const response = await fetch("/pending_requests?approval_type=Approval"); // Filter by approval_type=COGS
+          const response = await fetch(
+            "/pending_requests?approval_type=Approval"
+          ); // Filter by approval_type=COGS
           const data = await response.json();
 
           console.log("Approvals Data:", data);
@@ -137,7 +147,6 @@
         }
       }
 
-
       function viewPDF(uniqueId) {
         const url = `/export_pdf_file?unique_id=${uniqueId}`;
         window.open(url, "_blank"); // Opens the PDF file in a new tab
@@ -147,6 +156,9 @@
     </script>
   </head>
   <body>
+    <!-- <div class="logo-container">
+      <img src="/lipton_logo.png" alt="Company Logo" />
+    </div> -->
     <div class="container mt-5">
       <h1>Approvals Dashboard</h1>
       <div id="approvalsContainer" class="mt-4">

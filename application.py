@@ -37,7 +37,6 @@ login_manager.login_view = "login"
 
 
 
-
 # User class for Flask-Login
 class User(UserMixin):
     def __init__(self, id, username, role):
