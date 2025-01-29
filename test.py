@@ -1,21 +1,21 @@
-import bcrypt
+# import bcrypt
 
-def hash_password(password):
-    # Generate salt and hash
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed.decode('utf-8')
+# def hash_password(password):
+#     # Generate salt and hash
+#     salt = bcrypt.gensalt()
+#     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+#     return hashed.decode('utf-8')
 
-admin_password = "PriceStructureAdmin@123"  # Replace with the desired admin password
-hashed_password = hash_password(admin_password)
+# admin_password = "PriceStructureAdmin@123"  # Replace with the desired admin password
+# hashed_password = hash_password(admin_password)
 
-print("Hashed Password:", hashed_password)
+# print("Hashed Password:", hashed_password)
 
 
-# import secrets
+import secrets
 
-# secret_key = secrets.token_hex(16)  # 16 bytes = 32 hex characters
-# print(secret_key)
+secret_key = secrets.token_hex(16)  # 16 bytes = 32 hex characters
+print(secret_key)
 
 
 

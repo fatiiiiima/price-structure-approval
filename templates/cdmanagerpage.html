@@ -111,7 +111,7 @@
       async function rejectRequest(approvalId) {
         if (confirm("Are you sure you want to reject this request?")) {
           try {
-            const response = await fetch(`/reject_final`, {
+            const response = await fetch(`/reject_pre_final`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

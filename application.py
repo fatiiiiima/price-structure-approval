@@ -37,12 +37,14 @@ login_manager.login_view = "login"
 
 
 
+
 # User class for Flask-Login
 class User(UserMixin):
-    def __init__(self, id, username, role):
+    def __init__(self, id, username, role, emailaddress):
         self.id = id
         self.username = username
         self.role = role
+        self.emailaddress = emailaddress
 
 # Flask-Login user loader
 @login_manager.user_loader
@@ -50,11 +52,11 @@ def load_user(user_id):
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
-        query = "SELECT id, username, role FROM users WHERE id = ?"
+        query = "SELECT id, username, role, emailaddress FROM users WHERE id = ?"
         cursor.execute(query, user_id)
         row = cursor.fetchone()
         if row:
-            return User(row[0], row[1], row[2])
+            return User(row[0], row[1], row[2], row[3])
     except Exception as e:
         print("Error loading user:", e)
     return None
@@ -72,17 +74,17 @@ def login():
             cursor = conn.cursor()
 
             # Check the user in the database
-            query = "SELECT id, username, password_hash, role FROM users WHERE username = ?"
+            query = "SELECT id, username, password_hash, role, emailaddress FROM users WHERE username = ?"
             cursor.execute(query, username)
             row = cursor.fetchone()
 
             if row:
-                user_id, db_username, db_password_hash, role = row
+                user_id, db_username, db_password_hash, role, emailadress = row
 
                 # Verify the password
                 if bcrypt.checkpw(password.encode('utf-8'), db_password_hash.encode('utf-8')):
                     # Login the user
-                    user = User(user_id, db_username, role)
+                    user = User(user_id, db_username, role, emailadress)
                     login_user(user)
                     return redirect(url_for("dashboard"))
 
@@ -151,8 +153,24 @@ def get_sku_data(sku_number, country):
         sku_exists = cursor.fetchone()
 
         if not sku_exists:
+            cursor.execute("""
+             SELECT emailaddress
+             FROM users
+             WHERE role = 'admin' AND username != 'adminuser'
+            """)
+            admin_email = cursor.fetchone()
+            
+            subject = f"Missing SKU Data for {sku_number} in {country}"
+            body = f"Please add SKU {sku_number} for country {country} in the master file."
+            type = "action_required"
+            
+            cursor.execute("""
+                INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_)
+                VALUES (?, ?, ?, ?, ?)
+            """, (current_user.emailaddress, admin_email[0], subject, body, type))
+            conn.commit()
             conn.close()
-            return {"error": f"SKU Code {sku_number} not found for the country {country}"}
+            return {"error": f"SKU Code {sku_number} not found for the country {country}. Sent an email to the admin."}
 
         # Fetch data from the SKU_tts table
         query = """
@@ -621,16 +639,11 @@ def submit_request():
     rsp_per_case = data["new_rsp_per_case"]
     
 
-    
-    # print(vat)
-    
-    # print(sku_description)
-
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
 
     # Fetch approvers
-    cursor.execute("SELECT id, username FROM users WHERE role = 'ttsapprover'")
+    cursor.execute("SELECT id, username, emailaddress FROM users WHERE role = 'ttsapprover'")
     finance = cursor.fetchone() # current approver
     
     cursor.execute("""
@@ -693,9 +706,24 @@ def submit_request():
         vat, rm, wsm, dm, duty, cc, bd, cpp, pcs, rsp_per_case
     )
 )
+    
+    subject = f"Creation of Request for {sku_code} of {country}"
+    body = "A new request has been created. Please log in to the system to view the details."
+    type_ = 'create'
 
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, finance[2], subject, body, type_)
+    )
+    
 
     conn.commit()
+    
+    
+    
     conn.close()
 
     return jsonify({"message": "Request submitted successfully"}), 201
@@ -715,11 +743,46 @@ def approve_tts():
     cursor = conn.cursor()
     
     cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+            SELECT sku_code, country, requester_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
         request_id)
 
     data = cursor.fetchone()
     print(data)
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[2] )
+    
+    requester_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT CD_Manager
+        FROM CountryDetails
+        WHERE Country = ?""", 
+        data[1])
+    
+    
+    cd_manager_name = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT id, emailaddress
+        FROM users 
+        WHERE role = 'cdmanager' AND name = ?
+    """, cd_manager_name[0])
+    cd_manager_row = cursor.fetchone()
+    
+    if not cd_manager_row:
+        return jsonify({"error": f"No CD manager found for country {data[1]}"}), 400
+
+    cd_manager_email = cd_manager_row[1]
+  
+  
+    
+    
     
     updated_at = datetime.datetime.now()  # Current timestamp
     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
@@ -739,6 +802,18 @@ def approve_tts():
         request_id = ?
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'TTS'
     """, request_id_code, request_id, current_user.id)
+    
+    subject = f"Approval of TTS % for {data[0]} of {data[1]}"
+    body = f"TTS % has been approved. Please log in to the system to view the details."
+    type_ = 'approved'
+    
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_, CC1)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, cd_manager_email, subject, body, type_, requester_email[0])
+    )
 
     conn.commit()
     conn.close()
@@ -758,11 +833,19 @@ def reject_tts():
     cursor = conn.cursor()
     
     cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+            SELECT sku_code, country, requester_id FROM ApprovalRequestsWithDetails WHERE id = ?""", 
         request_id)
 
     data = cursor.fetchone()
     print(data)
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[2] )
+    
+    requester_email = cursor.fetchone()
     
     updated_at = datetime.datetime.now()  # Current timestamp
     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
@@ -783,6 +866,19 @@ def reject_tts():
             request_id = ?
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'TTS'
     """, request_id_code, request_id, current_user.id)
+    
+    
+    subject = f"TTS % rejected for {data[0]} of {data[1]}"
+    body = f"TTS % has been rejected. Please log in to the system to view the details."
+    type_ = 'rejected'
+    
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, requester_email[0], subject, body, type_)
+    )
 
     conn.commit()
     conn.close()
@@ -813,7 +909,7 @@ def change_tts():
 
     # Fetch request details
     cursor.execute("""
-        SELECT requester_id, next_approver_id FROM ApprovalRequestsWithDetails 
+        SELECT sku_code, country, requester_id, next_approver_id FROM ApprovalRequestsWithDetails 
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'TTS'
     """, request_id, current_user.id)
     request_data = cursor.fetchone()
@@ -822,7 +918,15 @@ def change_tts():
         conn.close()
         return jsonify({"error": "Request not found or unauthorized"}), 404
 
-    requester_id, next_approver_id = request_data
+    sku_code, country, requester_id, next_approver_id = request_data
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, requester_id )
+    
+    requester_email = cursor.fetchone()
 
     # Update the TTS % and set current_approver_id to requester_id
     cursor.execute("""
@@ -837,6 +941,18 @@ def change_tts():
             updated_at = GETDATE()
         WHERE id = ?
     """, new_tts, new_to, new_gp, new_gm, requester_id, request_id)
+    
+    subject = f"Change of TTS % for {sku_code} of {country}"
+    body = f"TTS % has been changed. Please log in to the system to view the details."
+    type_ = 'change'
+    
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, requester_email[0], subject, body, type_)
+    )
 
     conn.commit()
     conn.close()
@@ -851,6 +967,45 @@ def approve_new_tts():
 
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
+    
+    cursor.execute("""
+            SELECT sku_code, country, requester_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
+        request_id)
+
+    data = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE role = 'ttsapprover'           
+    """,)
+    
+    requester_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT CD_Manager
+        FROM CountryDetails
+        WHERE Country = ?""", 
+        data[1])
+    
+    
+    cd_manager_name = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT id, emailaddress
+        FROM users 
+        WHERE role = 'cdmanager' AND name = ?
+    """, cd_manager_name[0])
+    cd_manager_row = cursor.fetchone()
+    
+    if not cd_manager_row:
+        return jsonify({"error": f"No CD manager found for country {data[1]}"}), 400
+
+    cd_manager_email = cd_manager_row[1]
+  
+    
     try:
         cursor.execute("""
             UPDATE ApprovalRequestsWithDetails
@@ -865,6 +1020,18 @@ def approve_new_tts():
             )
             WHERE id = ?
         """, current_user.id, request_id)
+        subject = f"Approval of new TTS % for {data[0]} of {data[1]}"
+        body = f"New TTS % has been approved. Please log in to the system to view the details."
+        type_ = 'approved'
+        
+        cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_, CC1)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, cd_manager_email, subject, body, type_, requester_email[0])
+    )
+        
         conn.commit()
         return jsonify({"message": "New TTS approved"}), 200
     except Exception as e:
@@ -885,10 +1052,50 @@ def change_rsp():
     new_to = data.get('new_to')
     new_gp = data.get('new_gp')
     new_gm = data.get('new_gm')
+    
+    
 
 
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
+    
+    cursor.execute("""
+            SELECT sku_code, country, requester_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
+        request_id)
+
+    data = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE role = 'ttsapprover'           
+    """,)
+    
+    requester_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT CD_Manager
+        FROM CountryDetails
+        WHERE Country = ?""", 
+        data[1])
+    
+    
+    cd_manager_name = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT id, emailaddress
+        FROM users 
+        WHERE role = 'cdmanager' AND name = ?
+    """, cd_manager_name[0])
+    cd_manager_row = cursor.fetchone()
+    
+    if not cd_manager_row:
+        return jsonify({"error": f"No CD manager found for country {data[1]}"}), 400
+
+    cd_manager_email = cd_manager_row[1]
+    
     try:
         cursor.execute("""
             UPDATE ApprovalRequestsWithDetails
@@ -906,6 +1113,21 @@ def change_rsp():
             )
             WHERE id = ?
         """, new_rsp, new_bptt, new_cif, new_gsv, new_to, new_gp, new_gm, current_user.id, request_id)
+        
+        subject = f"Approval of new TTS % for {data[0]} of {data[1]}"
+        body = f"New TTS % has been approved with new RSP value. Please log in to the system to view the details."
+        type_ = 'approved'
+        
+        
+        cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_, CC1)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, cd_manager_email, subject, body, type_, requester_email[0])
+        )
+        
+        
         conn.commit()
         return jsonify({"message": "RSP updated"}), 200
     except Exception as e:
@@ -922,12 +1144,42 @@ def close_request():
 
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
+    
+    cursor.execute("""
+            SELECT sku_code, country, requester_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
+        request_id)
+
+    data = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE role = 'ttsapprover'           
+    """,)
+    
+    requester_email = cursor.fetchone()
+    
     try:
         cursor.execute("""
             UPDATE ApprovalRequestsWithDetails
             SET status = 'INACTIVE', current_approver_id = null
             WHERE id = ?
         """, request_id)
+        
+        subject = f"Request for {data[0]} of {data[1]} closed."
+        body = f"Request has been closed."
+        type_ = 'rejected'
+        
+        cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, requester_email[0], subject, body, type_)
+    )
+        
         conn.commit()
         return jsonify({"message": "Request closed"}), 200
     except Exception as e:
@@ -939,142 +1191,142 @@ def close_request():
     
 
 
-@app.route('/approve_cogs', methods=['POST'])
-@login_required
-def approve_cogs():
-    if current_user.role != 'cogsapprover':
-        return "Unauthorized", 403
+# @app.route('/approve_cogs', methods=['POST'])
+# @login_required
+# def approve_cogs():
+#     if current_user.role != 'cogsapprover':
+#         return "Unauthorized", 403
 
-    data = request.get_json()
-    print("COGS data:", data)
-    request_id = data['request_id']
+#     data = request.get_json()
+#     print("COGS data:", data)
+#     request_id = data['request_id']
 
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
+#     conn = pyodbc.connect(conn_str)
+#     cursor = conn.cursor()
     
-    cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
-        request_id)
+#     cursor.execute("""
+#             SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+#         request_id)
 
-    data = cursor.fetchone()
-    print(data)
+#     data = cursor.fetchone()
+#     print(data)
     
-    updated_at = datetime.datetime.now()  # Current timestamp
-    year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
-    request_id_code = f"{data[0]}_{data[1]}_{year_month}"
+#     updated_at = datetime.datetime.now()  # Current timestamp
+#     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
+#     request_id_code = f"{data[0]}_{data[1]}_{year_month}"
     
 
-    # Get the country for the request
-    cursor.execute("""
-        SELECT country 
-        FROM ApprovalRequestsWithDetails 
-        WHERE id = ?
-    """, request_id)
-    country_row = cursor.fetchone()
+#     # Get the country for the request
+#     cursor.execute("""
+#         SELECT country 
+#         FROM ApprovalRequestsWithDetails 
+#         WHERE id = ?
+#     """, request_id)
+#     country_row = cursor.fetchone()
 
-    if not country_row:
-        return jsonify({"error": "Request not found"}), 404
+#     if not country_row:
+#         return jsonify({"error": "Request not found"}), 404
 
-    country = country_row[0]
+#     country = country_row[0]
     
-    cursor.execute("""
-        SELECT CD_Manager
-        FROM CountryDetails
-        WHERE Country = ?""", 
-        country)
-    cd_manager_name = cursor.fetchone()
+#     cursor.execute("""
+#         SELECT CD_Manager
+#         FROM CountryDetails
+#         WHERE Country = ?""", 
+#         country)
+#     cd_manager_name = cursor.fetchone()
     
-    print(cd_manager_name[0])
+#     print(cd_manager_name[0])
     
-    # Get the CD Manager ID for the country
-    cursor.execute("""
-        SELECT id 
-        FROM users 
-        WHERE role = 'cdmanager' AND name = ?
-    """, cd_manager_name[0])
-    cd_manager_row = cursor.fetchone()
+#     # Get the CD Manager ID for the country
+#     cursor.execute("""
+#         SELECT id 
+#         FROM users 
+#         WHERE role = 'cdmanager' AND name = ?
+#     """, cd_manager_name[0])
+#     cd_manager_row = cursor.fetchone()
 
     
-    if not cd_manager_row:
-        return jsonify({"error": f"No CD manager found for country {country}"}), 400
+#     if not cd_manager_row:
+#         return jsonify({"error": f"No CD manager found for country {country}"}), 400
 
-    cd_manager_id = cd_manager_row[0]
+#     cd_manager_id = cd_manager_row[0]
 
-    # Approve COGS and set the next approver
-    cursor.execute("""
-        UPDATE ApprovalRequestsWithDetails 
-        SET status = 'COGS Approved', approval_type = 'Approval',
-            updated_at = GETDATE(), 
-            current_approver_id = (
-             SELECT id FROM users WHERE role = 'manager'
-            ), 
-            next_approver_id = ?, 
-            approver_name = (
-                SELECT name FROM users WHERE role = 'cogsapprover'
-            ), 
-            request_id = ?
-        WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
-    """, cd_manager_id, request_id_code, request_id, current_user.id)
+#     # Approve COGS and set the next approver
+#     cursor.execute("""
+#         UPDATE ApprovalRequestsWithDetails 
+#         SET status = 'COGS Approved', approval_type = 'Approval',
+#             updated_at = GETDATE(), 
+#             current_approver_id = (
+#              SELECT id FROM users WHERE role = 'manager'
+#             ), 
+#             next_approver_id = ?, 
+#             approver_name = (
+#                 SELECT name FROM users WHERE role = 'cogsapprover'
+#             ), 
+#             request_id = ?
+#         WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
+#     """, cd_manager_id, request_id_code, request_id, current_user.id)
 
-    conn.commit()
-    conn.close()
+#     conn.commit()
+#     conn.close()
 
-    return jsonify({"message": "COGS approved successfully"}), 200
+#     return jsonify({"message": "COGS approved successfully"}), 200
 
-@app.route('/reject_cogs', methods=['POST'])
-@login_required
-def reject_cogs():
-    if current_user.role != 'cogsapprover':
-        return "Unauthorized", 403
+# @app.route('/reject_cogs', methods=['POST'])
+# @login_required
+# def reject_cogs():
+#     if current_user.role != 'cogsapprover':
+#         return "Unauthorized", 403
 
-    data = request.get_json()
-    request_id = data['request_id']
+#     data = request.get_json()
+#     request_id = data['request_id']
 
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
+#     conn = pyodbc.connect(conn_str)
+#     cursor = conn.cursor()
 
-    # Check if the request exists
-    cursor.execute("""
-        SELECT id 
-        FROM ApprovalRequestsWithDetails 
-        WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
-    """, request_id, current_user.id)
-    request_row = cursor.fetchone()
+#     # Check if the request exists
+#     cursor.execute("""
+#         SELECT id 
+#         FROM ApprovalRequestsWithDetails 
+#         WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
+#     """, request_id, current_user.id)
+#     request_row = cursor.fetchone()
 
-    if not request_row:
-        return jsonify({"error": "Request not found or unauthorized"}), 404
+#     if not request_row:
+#         return jsonify({"error": "Request not found or unauthorized"}), 404
 
 
-    cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
-        request_id)
+#     cursor.execute("""
+#             SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+#         request_id)
 
-    data = cursor.fetchone()
-    print(data)
+#     data = cursor.fetchone()
+#     print(data)
     
-    updated_at = datetime.datetime.now()  # Current timestamp
-    year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
-    request_id_code = f"{data[0]}_{data[1]}_{year_month}"
+#     updated_at = datetime.datetime.now()  # Current timestamp
+#     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
+#     request_id_code = f"{data[0]}_{data[1]}_{year_month}"
     
-    # Reject COGS request and update the fields
-    cursor.execute("""
-        UPDATE ApprovalRequestsWithDetails 
-        SET status = 'COGS Rejected', 
-            updated_at = GETDATE(), 
-            approval_type = 'Rejected',
-            next_approver_id = NULL,
-            current_approver_id = NULL, 
-            approver_name = (
-                SELECT name FROM users WHERE role = 'cogsapprover'
-            ), 
-            request_id = ?
-        WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
-    """,request_id_code,  request_id, current_user.id)
+#     # Reject COGS request and update the fields
+#     cursor.execute("""
+#         UPDATE ApprovalRequestsWithDetails 
+#         SET status = 'COGS Rejected', 
+#             updated_at = GETDATE(), 
+#             approval_type = 'Rejected',
+#             next_approver_id = NULL,
+#             current_approver_id = NULL, 
+#             approver_name = (
+#                 SELECT name FROM users WHERE role = 'cogsapprover'
+#             ), 
+#             request_id = ?
+#         WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
+#     """,request_id_code,  request_id, current_user.id)
 
-    conn.commit()
-    conn.close()
+#     conn.commit()
+#     conn.close()
 
-    return jsonify({"message": "COGS request rejected successfully."}), 200
+#     return jsonify({"message": "COGS request rejected successfully."}), 200
 
 
 
@@ -1274,11 +1526,12 @@ def create_new_user():
 
     name = data.get("name")
     username = data.get("username")
+    email = data.get("email")
     password = data.get("password")
     role = data.get("role")
 
     # Validate required fields
-    if not all([name, username, password, role]):
+    if not all([name, username, email, password, role]):
         return jsonify({"error": "Missing required fields"}), 400
 
     # Define roles that require uniqueness
@@ -1308,9 +1561,9 @@ def create_new_user():
 
         # Insert the new user into the database
         cursor.execute("""
-            INSERT INTO users (name, username, password_hash, role)
-            VALUES (?, ?, ?, ?)
-        """, (name, username, password_hash, role))
+            INSERT INTO users (name, username, password_hash, role, emailaddress)
+            VALUES (?, ?, ?, ?, ?)
+        """, (name, username, password_hash, role, email))
 
         conn.commit()
         conn.close()
@@ -1388,11 +1641,41 @@ def approve_pre_final():
     cursor = conn.cursor()
     
     cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+            SELECT sku_code, country, requester_id, next_approver_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
         request_id)
 
     data = cursor.fetchone()
     print(data)
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[2] )
+    
+    requester_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE role = 'ttsapprover'           
+    """,)
+    
+    tts_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[3] )
+    
+    approveremail = cursor.fetchone()
+    
+    
+    
+    
     
     updated_at = datetime.datetime.now()  # Current timestamp
     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
@@ -1412,6 +1695,18 @@ def approve_pre_final():
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'CD Manager Approval'
     """, current_user.id, request_id_code, request_id, current_user.id)
     
+    subject = f"Approval for {data[0]} of {data[1]}"
+    body = f"The values for {data[0]} of {data[1]} have been approved. Please log in to the system to view the details."
+    type_ = 'approved'
+        
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_, CC1, CC2)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, approveremail[0], subject, body, type_, requester_email[0], tts_email[0])
+    )
+    
     conn.commit()
     conn.close()
     
@@ -1420,6 +1715,7 @@ def approve_pre_final():
 @app.route("/reject_pre_final", methods=["POST"])
 @login_required
 def reject_pre_final():
+    
     if current_user.role != 'cdmanager':
         return "Unauthorized", 403
 
@@ -1428,24 +1724,54 @@ def reject_pre_final():
 
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
+    
+    
    
     # Validate the request
-    cursor.execute("""
-        SELECT id 
-        FROM ApprovalRequestsWithDetails 
-        WHERE id = ? AND current_approver_id = ? AND approval_type = 'Final Approval'
-    """, request_id, current_user.id)
-    request_row = cursor.fetchone()
+    # cursor.execute("""
+    #     SELECT id 
+    #     FROM ApprovalRequestsWithDetails 
+    #     WHERE id = ? AND current_approver_id = ? AND approval_type = 'Final Approval'
+    # """, request_id, current_user.id)
+    
+    # request_row = cursor.fetchone()
 
-    if not request_row:
-        return jsonify({"error": "Request not found or unauthorized"}), 404
+    # if not request_row:
+    #     return jsonify({"error": "Request not found or unauthorized"}), 404
 
     cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+            SELECT sku_code, country, requester_id, next_approver_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
         request_id)
 
     data = cursor.fetchone()
     print(data)
+    
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[2] )
+    
+    requester_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE role = 'ttsapprover'           
+    """,)
+    
+    tts_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[3] )
+    
+    approveremail = cursor.fetchone()
     
     updated_at = datetime.datetime.now()  # Current timestamp
     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
@@ -1462,9 +1788,22 @@ def reject_pre_final():
                 SELECT name FROM users WHERE id = ?
             ), 
             request_id = ?
-        WHERE id = ? AND current_approver_id = ? AND approval_type = 'Final Approval'
+        WHERE id = ? AND current_approver_id = ? AND approval_type = 'CD Manager Approval'
     """, current_user.id, request_id_code, request_id, current_user.id)
-
+    
+    
+    subject = f"{data[0]} of {data[1]} Rejected"
+    body = f"The values for {data[0]} of {data[1]} have been rejected. Please log in to the system to view the details."
+    type_ = 'rejected'
+    
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_, CC1)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, requester_email[0], subject, body, type_, tts_email[0])
+    )
+    
     conn.commit()
     conn.close()
 
@@ -1484,11 +1823,51 @@ def final_approval():
     cursor = conn.cursor()
     
     cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+            SELECT sku_code, country, requester_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
         request_id)
 
     data = cursor.fetchone()
     print(data)
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[2] )
+    
+    requester_email = cursor.fetchone()
+    
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE role = 'ttsapprover'           
+    """,)
+    
+    tts_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT CD_Manager
+        FROM CountryDetails
+        WHERE Country = ?""", 
+        data[1])
+    
+    
+    cd_manager_name = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT id, emailaddress
+        FROM users 
+        WHERE role = 'cdmanager' AND name = ?
+    """, cd_manager_name[0])
+    cd_manager_row = cursor.fetchone()
+    
+    if not cd_manager_row:
+        return jsonify({"error": f"No CD manager found for country {data[1]}"}), 400
+
+    cd_manager_email = cd_manager_row[1]
     
     updated_at = datetime.datetime.now()  # Current timestamp
     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
@@ -1508,11 +1887,26 @@ def final_approval():
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'FinalApproval'
     """, current_user.id, request_id_code, request_id, current_user.id)
     
+    subject = f"Approval for {data[0]} of {data[1]}"
+    body = f"The values for {data[0]} of {data[1]} have been approved. Please log in to the system to view the details."
+    type_ = 'approved'
+    
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_, CC1, CC2)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, requester_email[0], subject, body, type_, tts_email[0], cd_manager_email)
+    )
+    
     cursor.execute("""
         SELECT country, sku_code, tts_percentage, bptt, cif, [RSP/Cs_LC]
         FROM ApprovalRequestsWithDetails 
         WHERE id = ?
     """, request_id)
+    
+    
+    
     request_details = cursor.fetchone()
     
     if request_details:
@@ -1589,11 +1983,51 @@ def final_reject():
     cursor = conn.cursor()
     
     cursor.execute("""
-            SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
+            SELECT sku_code, country, requester_id 
+            FROM ApprovalRequestsWithDetails 
+            WHERE id = ?""", 
         request_id)
 
     data = cursor.fetchone()
     print(data)
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE id = ?           
+    """, data[2] )
+    
+    requester_email = cursor.fetchone()
+    
+    
+    cursor.execute("""
+        SELECT emailaddress 
+        FROM users
+        WHERE role = 'ttsapprover'           
+    """,)
+    
+    tts_email = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT CD_Manager
+        FROM CountryDetails
+        WHERE Country = ?""", 
+        data[1])
+    
+    
+    cd_manager_name = cursor.fetchone()
+    
+    cursor.execute("""
+        SELECT id, emailaddress
+        FROM users 
+        WHERE role = 'cdmanager' AND name = ?
+    """, cd_manager_name[0])
+    cd_manager_row = cursor.fetchone()
+    
+    if not cd_manager_row:
+        return jsonify({"error": f"No CD manager found for country {data[1]}"}), 400
+
+    cd_manager_email = cd_manager_row[1]
     
     updated_at = datetime.datetime.now()  # Current timestamp
     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
@@ -1613,6 +2047,17 @@ def final_reject():
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'FinalApproval'
     """,  current_user.id, request_id_code, request_id, current_user.id)
     
+    subject = f"Request for {data[0]} of {data[1]} rejected"
+    body = f"The values for {data[0]} of {data[1]} have been rejected. Please log in to the system to view the details."
+    type_ = 'rejected'
+    
+    cursor.execute(
+        """
+        INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_, CC1, CC2)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (current_user.emailaddress, requester_email[0], subject, body, type_, tts_email[0], cd_manager_email)
+    )
     
     conn.commit()
     conn.close()
