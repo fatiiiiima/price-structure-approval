@@ -161,8 +161,21 @@ def get_sku_data(sku_number, country):
             admin_email = cursor.fetchone()
             
             subject = f"Missing SKU Data for {sku_number} in {country}"
-            body = f"Please add SKU {sku_number} for country {country} in the master file."
-            type = "action_required"
+            body = f"""
+            <p>Dear Admin,</p>
+
+            <p>The SKU with code <strong>{sku_number}</strong> is missing for the country <strong>{country}</strong> in the master file.</p>
+
+            <p>Kindly update the master file with the necessary data for this SKU to ensure smooth processing. You can log in to the system to review and add the required information.</p>
+
+            <p>Please log in to the <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>Price Structure Approval App</a> to make the updates.</p>
+
+            <p>Thank you for your attention to this matter.</p>
+
+            <p>Best regards, <br> Price Structure Approval Team</p>
+            """
+            type_ = "action_required"
+
             
             cursor.execute("""
                 INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_)
