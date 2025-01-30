@@ -707,8 +707,13 @@ def submit_request():
     )
 )
     
-    subject = f"Creation of Request for {sku_code} of {country}"
-    body = "A new request has been created. Please log in to the system to view the details."
+    subject = f"Creation of Request for {sku_code} for {country}"
+    body = f"""
+<p>A new request has been created for <strong>{sku_code}</strong> for <strong>{country}</strong> on the Price Structure App.</p>
+<p>Please log in to the system at: <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>Price Structure Approval App</a> to view the request details and take appropriate action.</p>
+<p>Regards, <br> Price Structure Approval Team</p>
+"""
+
     type_ = 'create'
 
     cursor.execute(
@@ -804,8 +809,17 @@ def approve_tts():
     """, request_id_code, request_id, current_user.id)
     
     subject = f"Approval of TTS % for {data[0]} of {data[1]}"
-    body = f"TTS % has been approved. Please log in to the system to view the details."
+    body = f"""
+    <p>Dear User,</p>
+
+    <p>The TTS % for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> has been approved.</p>
+
+    <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the approval details and take any necessary actions.</p>
+
+    <p>Regards, <br> Price Structure Approval Team</p>
+    """
     type_ = 'approved'
+
     
     cursor.execute(
         """
@@ -868,9 +882,18 @@ def reject_tts():
     """, request_id_code, request_id, current_user.id)
     
     
-    subject = f"TTS % rejected for {data[0]} of {data[1]}"
-    body = f"TTS % has been rejected. Please log in to the system to view the details."
+    subject = f"TTS % Rejected for {data[0]} of {data[1]}"
+    body = f"""
+    <p>Dear User,</p>
+
+    <p>The TTS % for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> has been rejected.</p>
+
+    <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the rejection details.</p>
+
+    <p>Regards, <br> Price Structure Approval Team</p>
+    """
     type_ = 'rejected'
+
     
     cursor.execute(
         """
@@ -943,8 +966,17 @@ def change_tts():
     """, new_tts, new_to, new_gp, new_gm, requester_id, request_id)
     
     subject = f"Change of TTS % for {sku_code} of {country}"
-    body = f"TTS % has been changed. Please log in to the system to view the details."
+    body = f"""
+    <p>Dear User,</p>
+
+    <p>The TTS % for <strong>{sku_code}</strong> in <strong>{country}</strong> has been updated.</p>
+
+    <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the updated details and take any required actions.</p>
+
+    <p>Regards, <br> Price Structure Approval Team</p>
+    """
     type_ = 'change'
+
     
     cursor.execute(
         """
@@ -1020,9 +1052,18 @@ def approve_new_tts():
             )
             WHERE id = ?
         """, current_user.id, request_id)
-        subject = f"Approval of new TTS % for {data[0]} of {data[1]}"
-        body = f"New TTS % has been approved. Please log in to the system to view the details."
+        subject = f"Approval of New TTS % for {data[0]} of {data[1]}"
+        body = f"""
+        <p>Dear User,</p>
+
+        <p>The new TTS % for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> has been approved.</p>
+
+        <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the updated details and take any required actions.</p>
+
+        <p>Regards, <br> Price Structure Approval Team</p>
+        """
         type_ = 'approved'
+
         
         cursor.execute(
         """
@@ -1114,9 +1155,18 @@ def change_rsp():
             WHERE id = ?
         """, new_rsp, new_bptt, new_cif, new_gsv, new_to, new_gp, new_gm, current_user.id, request_id)
         
-        subject = f"Approval of new TTS % for {data[0]} of {data[1]}"
-        body = f"New TTS % has been approved with new RSP value. Please log in to the system to view the details."
+        subject = f"Approval of New TTS % for {data[0]} of {data[1]}"
+        body = f"""
+        <p>Dear User,</p>
+
+        <p>The new TTS % for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> has been approved, along with an updated RSP value.</p>
+
+        <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the updated details and take any necessary actions.</p>
+
+        <p>Regards, <br> Price Structure Approval Team</p>
+        """
         type_ = 'approved'
+
         
         
         cursor.execute(
@@ -1168,9 +1218,18 @@ def close_request():
             WHERE id = ?
         """, request_id)
         
-        subject = f"Request for {data[0]} of {data[1]} closed."
-        body = f"Request has been closed."
+        subject = f"Request for {data[0]} of {data[1]} Closed"
+        body = f"""
+        <p>Dear User,</p>
+
+        <p>The request for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> has been closed.</p>
+
+        <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the closure details.</p>
+
+        <p>Regards, <br> Price Structure Approval Team</p>
+        """
         type_ = 'rejected'
+
         
         cursor.execute(
         """
@@ -1189,211 +1248,6 @@ def close_request():
         conn.close()
   
     
-
-
-# @app.route('/approve_cogs', methods=['POST'])
-# @login_required
-# def approve_cogs():
-#     if current_user.role != 'cogsapprover':
-#         return "Unauthorized", 403
-
-#     data = request.get_json()
-#     print("COGS data:", data)
-#     request_id = data['request_id']
-
-#     conn = pyodbc.connect(conn_str)
-#     cursor = conn.cursor()
-    
-#     cursor.execute("""
-#             SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
-#         request_id)
-
-#     data = cursor.fetchone()
-#     print(data)
-    
-#     updated_at = datetime.datetime.now()  # Current timestamp
-#     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
-#     request_id_code = f"{data[0]}_{data[1]}_{year_month}"
-    
-
-#     # Get the country for the request
-#     cursor.execute("""
-#         SELECT country 
-#         FROM ApprovalRequestsWithDetails 
-#         WHERE id = ?
-#     """, request_id)
-#     country_row = cursor.fetchone()
-
-#     if not country_row:
-#         return jsonify({"error": "Request not found"}), 404
-
-#     country = country_row[0]
-    
-#     cursor.execute("""
-#         SELECT CD_Manager
-#         FROM CountryDetails
-#         WHERE Country = ?""", 
-#         country)
-#     cd_manager_name = cursor.fetchone()
-    
-#     print(cd_manager_name[0])
-    
-#     # Get the CD Manager ID for the country
-#     cursor.execute("""
-#         SELECT id 
-#         FROM users 
-#         WHERE role = 'cdmanager' AND name = ?
-#     """, cd_manager_name[0])
-#     cd_manager_row = cursor.fetchone()
-
-    
-#     if not cd_manager_row:
-#         return jsonify({"error": f"No CD manager found for country {country}"}), 400
-
-#     cd_manager_id = cd_manager_row[0]
-
-#     # Approve COGS and set the next approver
-#     cursor.execute("""
-#         UPDATE ApprovalRequestsWithDetails 
-#         SET status = 'COGS Approved', approval_type = 'Approval',
-#             updated_at = GETDATE(), 
-#             current_approver_id = (
-#              SELECT id FROM users WHERE role = 'manager'
-#             ), 
-#             next_approver_id = ?, 
-#             approver_name = (
-#                 SELECT name FROM users WHERE role = 'cogsapprover'
-#             ), 
-#             request_id = ?
-#         WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
-#     """, cd_manager_id, request_id_code, request_id, current_user.id)
-
-#     conn.commit()
-#     conn.close()
-
-#     return jsonify({"message": "COGS approved successfully"}), 200
-
-# @app.route('/reject_cogs', methods=['POST'])
-# @login_required
-# def reject_cogs():
-#     if current_user.role != 'cogsapprover':
-#         return "Unauthorized", 403
-
-#     data = request.get_json()
-#     request_id = data['request_id']
-
-#     conn = pyodbc.connect(conn_str)
-#     cursor = conn.cursor()
-
-#     # Check if the request exists
-#     cursor.execute("""
-#         SELECT id 
-#         FROM ApprovalRequestsWithDetails 
-#         WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
-#     """, request_id, current_user.id)
-#     request_row = cursor.fetchone()
-
-#     if not request_row:
-#         return jsonify({"error": "Request not found or unauthorized"}), 404
-
-
-#     cursor.execute("""
-#             SELECT sku_code, country FROM ApprovalRequestsWithDetails WHERE id = ?""", 
-#         request_id)
-
-#     data = cursor.fetchone()
-#     print(data)
-    
-#     updated_at = datetime.datetime.now()  # Current timestamp
-#     year_month = updated_at.strftime("%Y-%m")  # Format as 'year-month'
-#     request_id_code = f"{data[0]}_{data[1]}_{year_month}"
-    
-#     # Reject COGS request and update the fields
-#     cursor.execute("""
-#         UPDATE ApprovalRequestsWithDetails 
-#         SET status = 'COGS Rejected', 
-#             updated_at = GETDATE(), 
-#             approval_type = 'Rejected',
-#             next_approver_id = NULL,
-#             current_approver_id = NULL, 
-#             approver_name = (
-#                 SELECT name FROM users WHERE role = 'cogsapprover'
-#             ), 
-#             request_id = ?
-#         WHERE id = ? AND current_approver_id = ? AND approval_type = 'COGS'
-#     """,request_id_code,  request_id, current_user.id)
-
-#     conn.commit()
-#     conn.close()
-
-#     return jsonify({"message": "COGS request rejected successfully."}), 200
-
-
-
-@app.route('/approve_request', methods=['POST'])
-@login_required
-def approve_request():
-    if current_user.role not in ['finance', 'marketing', 'admin']:
-        return jsonify({"error": "Unauthorized"}), 403
-
-    data = request.get_json()
-    request_id = data['request_id']
-    decision = data['decision']  # "approve" or "reject"
-
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-
-    # Fetch the current request
-    cursor.execute("SELECT * FROM ApprovalRequests WHERE id = ?", request_id)
-    request_data = cursor.fetchone()
-
-    if not request_data:
-        return jsonify({"error": "Request not found"}), 404
-
-    next_approver_id = None
-
-    if decision == 'approve':
-        # Determine the next approver
-        if current_user.role == 'finance':
-            cursor.execute("SELECT id FROM users WHERE role = 'marketing'")
-            next_approver_id = cursor.fetchone()[0]
-        elif current_user.role == 'marketing':
-            cursor.execute("SELECT id FROM users WHERE role = 'commercial_finance'")
-            next_approver_id = cursor.fetchone()[0]
-        elif current_user.role == 'commercial_finance':
-            cursor.execute("SELECT id FROM users WHERE role = 'country_manager'")
-            next_approver_id = cursor.fetchone()[0]
-        elif current_user.role == 'country_manager':
-            cursor.execute("SELECT id FROM users WHERE username = 'Sudha'")
-            next_approver_id = cursor.fetchone()[0]
-
-        if next_approver_id:
-            # Assign the request to the next approver
-            cursor.execute("""
-                UPDATE ApprovalRequests
-                SET current_approver_id = ?, updated_at = GETDATE()
-                WHERE id = ?
-            """, next_approver_id, request_id)
-        else:
-            # Fully approve the request
-            cursor.execute("""
-                UPDATE ApprovalRequests
-                SET status = 'Approved', updated_at = GETDATE()
-                WHERE id = ?
-            """, request_id)
-    elif decision == 'reject':
-        # Reject the request and return it to the requester
-        cursor.execute("""
-            UPDATE ApprovalRequests
-            SET current_approver_id = requester_id, status = 'Rejected', updated_at = GETDATE()
-            WHERE id = ?
-        """, request_id)
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Request updated successfully"}), 200
-
 
 
 @app.route('/pending_requests', methods=['GET'])
@@ -1696,8 +1550,17 @@ def approve_pre_final():
     """, current_user.id, request_id_code, request_id, current_user.id)
     
     subject = f"Approval for {data[0]} of {data[1]}"
-    body = f"The values for {data[0]} of {data[1]} have been approved. Please log in to the system to view the details."
+    body = f"""
+    <p>Dear User,</p>
+
+    <p>The values for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> have been approved.</p>
+
+    <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the approval details and take the further action.</p>
+
+    <p>Regards, <br> Price Structure Approval Team</p>
+    """
     type_ = 'approved'
+
         
     cursor.execute(
         """
@@ -1793,8 +1656,17 @@ def reject_pre_final():
     
     
     subject = f"{data[0]} of {data[1]} Rejected"
-    body = f"The values for {data[0]} of {data[1]} have been rejected. Please log in to the system to view the details."
+    body = f"""
+    <p>Dear User,</p>
+
+    <p>The values for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> have been rejected.</p>
+
+    <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the details and take any necessary actions.</p>
+
+    <p>Regards, <br> Price Structure Approval Team</p>
+    """
     type_ = 'rejected'
+
     
     cursor.execute(
         """
@@ -1888,8 +1760,17 @@ def final_approval():
     """, current_user.id, request_id_code, request_id, current_user.id)
     
     subject = f"Approval for {data[0]} of {data[1]}"
-    body = f"The values for {data[0]} of {data[1]} have been approved. Please log in to the system to view the details."
+    body = f"""
+    <p>Dear User,</p>
+
+    <p>The values for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> have been approved.</p>
+
+    <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the details and take any necessary actions.</p>
+
+    <p>Regards, <br> Price Structure Approval Team</p>
+    """
     type_ = 'approved'
+
     
     cursor.execute(
         """
@@ -2047,9 +1928,18 @@ def final_reject():
         WHERE id = ? AND current_approver_id = ? AND approval_type = 'FinalApproval'
     """,  current_user.id, request_id_code, request_id, current_user.id)
     
-    subject = f"Request for {data[0]} of {data[1]} rejected"
-    body = f"The values for {data[0]} of {data[1]} have been rejected. Please log in to the system to view the details."
+    subject = f"Request for {data[0]} of {data[1]} Rejected"
+    body = f"""
+    <p>Dear User,</p>
+
+    <p>The values for <strong>{data[0]}</strong> in <strong>{data[1]}</strong> have been rejected.</p>
+
+    <p>Please <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>log in to the Price Structure Approval App</a> to view the details.</p>
+
+    <p>Regards, <br> Price Structure Approval Team</p>
+    """
     type_ = 'rejected'
+
     
     cursor.execute(
         """
