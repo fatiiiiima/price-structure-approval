@@ -27,9 +27,8 @@
         event.preventDefault(); // Prevent form submission
 
         const skuNumber = document.getElementById("skuSelect").value;
-        console.log("this is the sku", skuNumber);
+
         const country = document.getElementById("countrySelect").value;
-        console.log("this is the country", country);
 
         // Send request to backend
         const response = await fetch("/get_sku_info", {
@@ -41,13 +40,27 @@
         });
 
         const data = await response.json();
-        console.log("this is the response", data);
 
-        // Update the display section
+        if (response.ok) {
+          displaySKUInfo(data);
+        } else if (data.missing_sku) {
+          if (
+            confirm(
+              `The SKU ${skuNumber} for ${country} does not exist. Would you like to send an email to the admin?`
+            )
+          ) {
+            await sendMissingSKUEmail(skuNumber, country);
+          } else {
+            alert(data.error);
+          }
+        }
+      }
+
+      function displaySKUInfo(data) {
         const displaySection = document.getElementById("skuInfo");
         if (response.ok) {
           currency = data.currency;
-          console.log("Currency:", currency);
+          
 
           displaySection.innerHTML = `
           <h3>SKU Details:</h3>
@@ -163,6 +176,23 @@
         }
       }
 
+      async function sendMissingSKUEmail(skuNumber, country) {
+        const response = await fetch("/send_missing_sku_email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ sku_number: skuNumber, country: country }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          alert(data.message);
+        } else {
+          alert("Failed to send the email. Please try again later.");
+        }
+      }
+
       function validateTTS() {
         const ttsInput = document.getElementById("newTTS");
         const errorTTS = document.getElementById("errorTTS");
@@ -193,48 +223,29 @@
 
       async function calculate_values() {
         const newRSP = document.getElementById("newRSP").value;
-        console.log(newRSP);
+        
 
         const newTTS = document.getElementById("newTTS").value;
-        console.log("this is the new tts %", newTTS);
 
         const cogs_local_per_case =
           document.getElementById("cogs_local_case").innerText;
-        console.log("this is the local cogs per case", cogs_local_per_case);
         const pcs = document.getElementById("pcs").innerText;
-        console.log("this is the pcs", pcs);
         const vat = document.getElementById("vat").innerText;
-        console.log(vat);
         const newVat = removePercentageSign(vat);
-        console.log(newVat);
         const rm = document.getElementById("rm").innerText;
-        console.log(rm);
         const newRM = removePercentageSign(rm);
-        console.log(newRM);
         const wsm = document.getElementById("wsm").innerText;
-        console.log(wsm);
         const newWSM = removePercentageSign(wsm);
-        console.log(newWSM);
         const dm = document.getElementById("dm").innerText;
-        console.log(dm);
         const newDM = removePercentageSign(dm);
-        console.log(newDM);
         const duty = document.getElementById("duty").innerText;
-        console.log(duty);
         const newDuty = removePercentageSign(duty);
-        console.log(newDuty);
         const cc = document.getElementById("cc").innerText;
-        console.log(cc);
         const newCC = removePercentageSign(cc);
-        console.log(newCC);
         const bd = document.getElementById("bd").innerText;
-        console.log(bd);
         const newBD = removePercentageSign(bd);
-        console.log(newBD);
         const cpp = document.getElementById("cpp").innerText;
-        console.log(cpp);
         const newCPP = removePercentageSign(cpp);
-        console.log(newCPP);
 
         const response = await fetch("/calculate_results", {
           method: "POST",
@@ -258,7 +269,6 @@
         });
 
         const data = await response.json();
-        console.log(data);
 
         if (response.ok) {
           // Display calculated values
@@ -343,77 +353,40 @@
         const newBPTT = document.getElementById("new_bptt").innerText;
         const newCIF = document.getElementById("new_cif").innerText;
         const newRSP = document.getElementById("new_rsp").innerText;
-        console.log("new rsp", newRSP);
         const newRSPPerCase =
           document.getElementById("new_rsp_per_case").innerText;
         const newGSV = document.getElementById("gsv").innerText;
         const tts = document.getElementById("new_tts_percentage").innerText;
-        console.log("new tts", tts);
         const to = document.getElementById("to").innerText;
         const gp = document.getElementById("gp").innerText;
         const gm = document.getElementById("gm").innerText;
         const cogs_new = document.getElementById("new_cogs").innerText;
         const sku_description =
           document.getElementById("description").innerText;
-        console.log("cogs", cogs_new);
 
         const newTTS = document.getElementById("newTTS").value;
-        console.log("this is the new tts %", newTTS);
 
         const cogs_local_per_case =
           document.getElementById("cogs_local_case").innerText;
-        console.log("this is the local cogs per case", cogs_local_per_case);
         const pcs = document.getElementById("pcs").innerText;
-        console.log("this is the pcs", pcs);
         const vat = document.getElementById("vat").innerText;
-        console.log(vat);
         const newVat = removePercentageSign(vat);
-        console.log(newVat);
         const rm = document.getElementById("rm").innerText;
-        console.log(rm);
         const newRM = removePercentageSign(rm);
-        console.log(newRM);
         const wsm = document.getElementById("wsm").innerText;
-        console.log(wsm);
         const newWSM = removePercentageSign(wsm);
-        console.log(newWSM);
         const dm = document.getElementById("dm").innerText;
-        console.log(dm);
         const newDM = removePercentageSign(dm);
-        console.log(newDM);
         const duty = document.getElementById("duty").innerText;
-        console.log(duty);
         const newDuty = removePercentageSign(duty);
-        console.log(newDuty);
         const cc = document.getElementById("cc").innerText;
-        console.log(cc);
         const newCC = removePercentageSign(cc);
-        console.log(newCC);
         const bd = document.getElementById("bd").innerText;
-        console.log(bd);
         const newBD = removePercentageSign(bd);
-        console.log(newBD);
         const cpp = document.getElementById("cpp").innerText;
-        console.log(cpp);
         const newCPP = removePercentageSign(cpp);
-        console.log(newCPP);
 
-        console.log({
-          sku_code: skuCode,
-          country: country,
-          bptt: newBPTT,
-          cif: newCIF,
-          new_rsp: newRSP,
-          gsv: newGSV,
-          new_tts: tts,
-          to: to,
-          gp: gp,
-          gm: gm,
-          cogs: cogs_new,
-          sku_description: sku_description,
-          new_rsp_per_case: newRSPPerCase,
-        });
-
+      
         try {
           const response = await fetch("/submit_request", {
             method: "POST",

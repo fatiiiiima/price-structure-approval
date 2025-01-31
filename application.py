@@ -331,24 +331,7 @@ def next_page():
     return render_template('formupdate.html')
 
 
-# @app.route("/get_skus", methods=["GET"])
-# def get_skus():
-#     try:
-#         # Connect to the database
-#         conn = pyodbc.connect(conn_str)
-#         cursor = conn.cursor()
 
-#         # Query the database for distinct SKU values
-#         cursor.execute("SELECT DISTINCT [SKU Code] FROM SKU_tts")  # Adjust table/column names if needed
-#         skus = [row[0] for row in cursor.fetchall()]  # Fetch all SKUs into a list
-
-#         # Close the connection
-#         conn.close()
-
-#         return jsonify({"skus": skus}), 200
-#     except Exception as e:
-#         print("Error:", e)
-#         return jsonify({"error": "Failed to fetch SKUs"}), 500
 
 @app.route("/get_sku_descriptions", methods=["GET"])
 def get_sku_descriptions():
@@ -404,18 +387,55 @@ def get_sku_info():
     if not sku_number or not country:
         return jsonify({"error": "Both 'sku_number' and 'country' are required fields"}), 400
 
-    # Fetch SKU information from the database
+    # Fetch SKU information
     sku_info = get_sku_data(sku_number, country)
-    
-    # Check for error in the result
-    if "error" in sku_info:
-        return jsonify({"error": sku_info["error"]}), 404
 
-    # Add country for context
+    if "error" in sku_info:
+        return jsonify({"error": sku_info["error"], "missing_sku": True}), 404
+
     sku_info["country"] = country
     return jsonify(sku_info), 200
 
-    
+
+@app.route("/send_missing_sku_email", methods=["POST"])
+def send_missing_sku_email():
+    data = request.json
+    sku_number = data.get("sku_number")
+    country = data.get("country")
+
+    try:
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+        
+        # Fetch admin email
+        cursor.execute("""
+            SELECT emailaddress 
+            FROM users 
+            WHERE role = 'admin' AND username != 'adminuser'
+        """)
+        admin_email = cursor.fetchone()
+
+        subject = f"Missing SKU Data for {sku_number} in {country}"
+        body = f"""
+        <p>Dear Admin,</p>
+        <p>The SKU with code <strong>{sku_number}</strong> is missing for the country <strong>{country}</strong> in the master file.</p>
+        <p>Please log in to the <a href='https://pricestructureapproval-a7fpdbgzbvd3h0eh.canadacentral-01.azurewebsites.net/'>Price Structure Approval App</a> to make the updates.</p>
+        <p>Thank you.<br>Price Structure Approval Team</p>
+        """
+        type_ = "action_required"
+
+        cursor.execute("""
+            INSERT INTO Notifications (FROM_USER, TO_USER, SUBJECT_, BODY, TYPE_)
+            VALUES (?, ?, ?, ?, ?)
+        """, (current_user.emailaddress, admin_email[0], subject, body, type_))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": f"Email sent to admin regarding SKU {sku_number} for {country}."}), 200
+
+    except Exception as e:
+        print("Database error:", e)
+        return jsonify({"error": "Failed to send the email."}), 500
 
 
 @app.route('/calculate_results', methods=['POST'])
@@ -2692,295 +2712,7 @@ def upload_master_excel():
 import pandas as pd
 from sqlalchemy import create_engine
 
-# @app.route('/upload_qatar_ps_excel', methods=['POST'])
-# @login_required
-# def upload_qatar_ps_excel():
-#     if current_user.role != 'admin':
-#         return "Unauthorized", 403
 
-#     try:
-#         # Check if a file was uploaded
-#         if 'file' not in request.files:
-#             return jsonify({"error": "No file provided"}), 400
-
-#         file = request.files['file']
-
-#         # Check if the file is an Excel file
-#         if not file.filename.endswith(('.xls', '.xlsx')):
-#             return jsonify({"error": "Invalid file format. Please upload an Excel file."}), 400
-
-#         # Read the Excel file into a pandas DataFrame
-#         df = pd.read_excel(file)
-        
-#         required_columns = [
-#             'DD code', 'Enitity', 'SKU Code', 'Comments', 'DB SKU', 'CPD code', 
-#             'SKU Description', 'Brand', 'Sector', 'Flavor', 'Format', 'Packing', 
-#             'Project', 'Type', 'SU', 'Cases/Ton', 'Units/Cs', 'Valid from', 'Valid to',
-#             'Proposed RSP (inc VAT) LC', 'VAT %', 'VAT', 'Proposed RSP (ex VAT) LC',
-#             'RSP/Cs_LC', 'RM %', 'Retail Markup LC', 'Retail Price LC', 'WSM %', 
-#             'W/Sale Markup LC', 'BPTT LC/Case', 'DM %', 'Distributor Markup LC', 
-#             'DPLC LC/case', 'Duty %', 'Duty', 'Clearing Charges %', 'Clearing Charges', 
-#             'BD', 'CIF LC/case', 'CPP%', 'CPP', 'GSV LC/case', 'F43', 'Stock', 
-#             'Z521 SAP', 'F46', 'F47', 'BPTT $/Case', 'CIF $/Case', 'BPTT $/Ton', 
-#             'CIF $/Ton', 'GSV/Ton $', 'BPTT  LC/Piece', 'Check', 'Z009', 'Z521', 
-#             'Z000'
-#         ]
-        
-#         column_rename_mapping = {
-#             "RSP/Cs\nLC": "RSP/Cs_LC",
-#             # Add additional mappings if column names in Excel differ from table columns
-#         }
-#         df.rename(columns=column_rename_mapping, inplace=True)
-
-#         # Rename unnamed columns to match the SQL table schema
-#         unnamed_columns = df.filter(like='Unnamed').columns.tolist()
-#         print(unnamed_columns)
-#         column_mapping = {
-#             unnamed_columns[0]: 'F43',
-#             unnamed_columns[1]: 'F46',
-#             unnamed_columns[2]: 'F47'
-#         }
-#         df.rename(columns=column_mapping, inplace=True)
-#         print(df.columns)
-        
-        
-        
-#         # if not all(column in df.columns for column in required_columns):
-            
-#         #     return jsonify({"error": "Excel file is missing required columns."}), 400
-
-#         numeric_columns = [
-#             'Enitity', 'SKU Code', 'DB SKU', 'Cases/Ton', 'Units/Cs', 
-#             'Proposed RSP (inc VAT) LC', 'VAT %', 'VAT', 'Proposed RSP (ex VAT) LC',
-#             'RSP/Cs_LC', 'RM %', 'Retail Markup LC', 'Retail Price LC', 'WSM %', 
-#             'W/Sale Markup LC', 'BPTT LC/Case', 'DM %', 'Distributor Markup LC', 
-#             'DPLC LC/case', 'Duty %', 'Duty', 'Clearing Charges %', 'Clearing Charges', 
-#             'BD', 'CIF LC/case', 'CPP%', 'CPP', 'GSV LC/case', 'F43', 'F46', 'F47', 
-#             'BPTT $/Case', 'CIF $/Case', 'BPTT $/Ton', 'CIF $/Ton', 'GSV/Ton $', 
-#             'BPTT  LC/Piece', 'Check'
-#         ]
-        
-#         for column in numeric_columns:
-#             if column in df.columns:
-#                 df[column] = pd.to_numeric(df[column], errors='coerce').fillna(0)
-
-
-#         categorical_columns = [
-#             'DD code', 'Comments', 'CPD code', 'SKU Description', 'Brand', 'Sector', 
-#             'Flavor', 'Format', 'Packing', 'Project', 'Type', 'SU', 'Valid to'
-#         ]
-#         for column in categorical_columns:
-#             if column in df.columns:
-#                 df[column] = df[column].astype(str).fillna('')
-                
-            
-#         if 'Valid from' in df.columns:
-#             df['Valid from'] = pd.to_datetime(df['Valid from'], errors='coerce').dt.strftime('%Y-%m-%d')
-
-#         conn = pyodbc.connect(conn_str)
-#         cursor = conn.cursor()
-
-#         # Clear existing table
-#         cursor.execute("TRUNCATE TABLE [Qatar_PS_New]") 
-        
-#         for idx, row in df.iterrows():
-#             try:
-#                 cursor.execute(
-#                 """
-#                 INSERT INTO [Qatar_PS_New] (
-#                     [DD code], [Enitity], [SKU Code], [Comments], [DB SKU], [CPD code], 
-#                     [SKU Description], [Brand], [Sector], [Flavor], [Format], [Packing], 
-#                     [Project], [Type], [SU], [Cases/Ton], [Units/Cs], [Valid from], [Valid to],
-#                     [Proposed RSP (inc VAT) LC], [VAT %], [VAT], [Proposed RSP (ex VAT) LC],
-#                     [RSP/Cs_LC], [RM %], [Retail Markup LC], [Retail Price LC], [WSM %], 
-#                     [W/Sale Markup LC], [BPTT LC/Case], [DM %], [Distributor Markup LC], 
-#                     [DPLC LC/case], [Duty %], [Duty], [Clearing Charges %], [Clearing Charges], 
-#                     [BD], [CIF LC/case], [CPP%], [CPP], [GSV LC/case], [F43], [Stock], 
-#                     [Z521 SAP], [F46], [F47], [BPTT $/Case], [CIF $/Case], [BPTT $/Ton], 
-#                     [CIF $/Ton], [GSV/Ton $], [BPTT  LC/Piece], [Check], [Z009], [Z521], 
-#                     [Z000]
-#                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-#                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-#                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-#                 """,
-#                 (
-#                     row['DD code'], float(row['Enitity']), float(row['SKU Code']),
-#                     row['Comments'], float(row['DB SKU']), row['CPD code'], 
-#                     row['SKU Description'], row['Brand'], row['Sector'], row['Flavor'], 
-#                     row['Format'], row['Packing'], row['Project'], row['Type'], row['SU'], 
-#                     float(row['Cases/Ton']), float(row['Units/Cs']), row['Valid from'], 
-#                     row['Valid to'], float(row['Proposed RSP (inc VAT) LC']), float(row['VAT %']),
-#                     float(row['VAT']), float(row['Proposed RSP (ex VAT) LC']), 
-#                     float(row['RSP/Cs_LC']), float(row['RM %']), float(row['Retail Markup LC']), 
-#                     float(row['Retail Price LC']), float(row['WSM %']), float(row['W/Sale Markup LC']),
-#                     float(row['BPTT LC/Case']), float(row['DM %']), float(row['Distributor Markup LC']),
-#                     float(row['DPLC LC/case']), float(row['Duty %']), float(row['Duty']), 
-#                     float(row['Clearing Charges %']), float(row['Clearing Charges']), row['BD'], 
-#                     float(row['CIF LC/case']), float(row['CPP%']), float(row['CPP']), 
-#                     float(row['GSV LC/case']), float(row['F43']), float(row['Stock']), 
-#                     row['Z521 SAP'], float(row['F46']), float(row['F47']), 
-#                     float(row['BPTT $/Case']), float(row['CIF $/Case']), float(row['BPTT $/Ton']), 
-#                     float(row['CIF $/Ton']), float(row['GSV/Ton $']), float(row['BPTT  LC/Piece']), 
-#                     float(row['Check']), row['Z009'], row['Z521'], row['Z000']
-#                 )
-#             )
-#             except Exception as e:
-#                 print(f"Error at row {idx}: {e}")
-#                 print(f"Column causing error: {column}")
-#                 print(f"Value: {row[column]}")
-#                 print("Parameters:")
-
-
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-
-#         return jsonify({"message": "Table successfully updated with the uploaded Excel file!"})
-
-     
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
-
-# @app.route('/upload_qatar_ps_excel', methods=['POST'])
-# @login_required
-# def upload_qatar_ps_excel():
-#     if current_user.role != 'admin':
-#         return "Unauthorized", 403
-
-#     try:
-#         # Check if a file was uploaded
-#         if 'file' not in request.files:
-#             return jsonify({"error": "No file provided"}), 400
-
-#         file = request.files['file']
-
-#         # Check if the file is an Excel file
-#         if not file.filename.endswith(('.xls', '.xlsx')):
-#             return jsonify({"error": "Invalid file format. Please upload an Excel file."}), 400
-
-#         # Read the Excel file into a pandas DataFrame
-#         df = pd.read_excel(file)
-        
-#         required_columns = [
-#             'DD code', 'Enitity', 'SKU Code', 'Comments', 'DB SKU', 'CPD code', 
-#             'SKU Description', 'Brand', 'Sector', 'Flavor', 'Format', 'Packing', 
-#             'Project', 'Type', 'SU', 'Cases/Ton', 'Units/Cs', 'Valid from', 'Valid to',
-#             'Proposed RSP (inc VAT) LC', 'VAT %', 'VAT', 'Proposed RSP (ex VAT) LC',
-#             'RSP/Cs_LC', 'RM %', 'Retail Markup LC', 'Retail Price LC', 'WSM %', 
-#             'W/Sale Markup LC', 'BPTT LC/Case', 'DM %', 'Distributor Markup LC', 
-#             'DPLC LC/case', 'Duty %', 'Duty', 'Clearing Charges %', 'Clearing Charges', 
-#             'BD', 'CIF LC/case', 'CPP%', 'CPP', 'GSV LC/case', 'F43', 'Stock', 
-#             'Z521 SAP', 'F46', 'F47', 'BPTT $/Case', 'CIF $/Case', 'BPTT $/Ton', 
-#             'CIF $/Ton', 'GSV/Ton $', 'BPTT  LC/Piece', 'Check', 'Z009', 'Z521', 
-#             'Z000'
-#         ]
-        
-#         column_rename_mapping = {
-#             "RSP/Cs\nLC": "RSP/Cs_LC",
-#             # Add additional mappings if column names in Excel differ from table columns
-#         }
-#         df.rename(columns=column_rename_mapping, inplace=True)
-
-#         # Rename unnamed columns to match the SQL table schema
-#         unnamed_columns = df.filter(like='Unnamed').columns.tolist()
-#         print(unnamed_columns)
-#         column_mapping = {
-#             unnamed_columns[0]: 'F43',
-#             unnamed_columns[1]: 'F46',
-#             unnamed_columns[2]: 'F47'
-#         }
-#         df.rename(columns=column_mapping, inplace=True)
-#         print(df.columns)
-        
-        
-        
-#         # if not all(column in df.columns for column in required_columns):
-            
-#         #     return jsonify({"error": "Excel file is missing required columns."}), 400
-
-#         numeric_columns = [
-#             'Enitity', 'SKU Code', 'DB SKU', 'Cases/Ton', 'Units/Cs', 
-#             'Proposed RSP (inc VAT) LC', 'VAT %', 'VAT', 'Proposed RSP (ex VAT) LC',
-#             'RSP/Cs_LC', 'RM %', 'Retail Markup LC', 'Retail Price LC', 'WSM %', 
-#             'W/Sale Markup LC', 'BPTT LC/Case', 'DM %', 'Distributor Markup LC', 
-#             'DPLC LC/case', 'Duty %', 'Duty', 'Clearing Charges %', 'Clearing Charges', 
-#             'BD', 'CIF LC/case', 'CPP%', 'CPP', 'GSV LC/case', 'F43', 'F46', 'F47', 
-#             'BPTT $/Case', 'CIF $/Case', 'BPTT $/Ton', 'CIF $/Ton', 'GSV/Ton $', 
-#             'BPTT  LC/Piece', 'Check'
-#         ]
-        
-#         for column in numeric_columns:
-#             if column in df.columns:
-#                 df[column] = pd.to_numeric(df[column], errors='coerce').fillna(0)
-
-
-#         categorical_columns = [
-#             'DD code', 'Comments', 'CPD code', 'SKU Description', 'Brand', 'Sector', 
-#             'Flavor', 'Format', 'Packing', 'Project', 'Type', 'SU'
-#         ]
-#         for column in categorical_columns:
-#             if column in df.columns:
-#                 df[column] = df[column].astype(str).fillna('')
-                
-            
-#         if 'Valid from' in df.columns:
-#             df['Valid from'] = pd.to_datetime(df['Valid from'], errors='coerce').dt.strftime('%Y-%m-%d')
-
-#         conn = pyodbc.connect(conn_str)
-#         cursor = conn.cursor()
-
-#         # Clear existing table
-#         cursor.execute("TRUNCATE TABLE [Qatar_PS_New]") 
-        
-#         for idx, row in df.iterrows():
-#             try:
-#                 cursor.execute(
-#                 """
-#                 INSERT INTO [Qatar_PS_New] (
-#                     [DD code], [Enitity], [SKU Code], [Comments], [DB SKU], [CPD code], [SKU Description], 
-#                     [Brand], [Sector], [Flavor], [Format], [Packing], [Project], [Type], [SU], [Cases/Ton], [Units/Cs], 
-#                     [Proposed RSP (inc VAT) LC], [VAT %], [VAT], [Proposed RSP (ex VAT) LC], [RSP/Cs_LC], 
-#                     [RM %], [Retail Markup LC], [Retail Price LC], [WSM %], [W/Sale Markup LC], [BPTT LC/Case], [DM %], [Distributor Markup LC], 
-#                     [DPLC LC/case], [Duty %], [Duty], [Clearing Charges %], [Clearing Charges],
-#                     [BD], [CIF LC/case], [CPP%], [CPP], [GSV LC/case], [BPTT $/Case], [CIF $/Case], [BPTT $/Ton], [CIF $/Ton], [GSV/Ton $], [BPTT  LC/Piece], [Check], [Z009], [Z521],                      [Z000]
-#                 ) VALUES (?, ?, ?, ?, ?, ?, ?,?,?,?,?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-#                 """,
-#                 (
-#                     row['DD code'], float(row['Enitity']), float(row['SKU Code']),
-#                     row['Comments'], float(row['DB SKU']), row['CPD code'], 
-#                     row['SKU Description'], row['Brand'], row['Sector'], row['Flavor'], 
-#                     row['Format'], row['Packing'], row['Project'], row['Type'], row['SU'], 
-#                     float(row['Cases/Ton']), float(row['Units/Cs']), float(row['Proposed RSP (inc VAT) LC']), 
-#                     float(row['VAT %']), float(row['VAT']), float(row['Proposed RSP (ex VAT) LC']), 
-#                     float(row['RSP/Cs_LC']), float(row['RM %']), float(row['Retail Markup LC']), 
-#                     float(row['Retail Price LC']), float(row['WSM %']), float(row['W/Sale Markup LC']),
-#                     float(row['BPTT LC/Case']), float(row['DM %']), float(row['Distributor Markup LC']),
-#                     float(row['DPLC LC/case']), float(row['Duty %']), float(row['Duty']), 
-#                     float(row['Clearing Charges %']), float(row['Clearing Charges']), row['BD'], 
-#                     float(row['CIF LC/case']), float(row['CPP%']), float(row['CPP']), 
-#                     float(row['GSV LC/case']), float(row['BPTT $/Case']), float(row['CIF $/Case']), float(row['BPTT $/Ton']), 
-#                     float(row['CIF $/Ton']), float(row['GSV/Ton $']), float(row['BPTT  LC/Piece']), 
-#                     float(row['Check']), row['Z009'], row['Z521'], row['Z000']
-                    
-#                 )
-#             )
-#             except Exception as e:
-#                 print(f"Error at row {idx}: {e}")
-#                 print(f"Column causing error: {column}")
-#                 print(f"Value: {row[column]}")
-#                 print("Parameters:")
-
-
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-
-#         return jsonify({"message": "Table successfully updated with the uploaded Excel file!"})
-
-     
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
 
 @app.route('/upload_ksa_ps_excel', methods=['POST'])
 @login_required

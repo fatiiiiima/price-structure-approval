@@ -39,7 +39,6 @@
           const response = await fetch("/all_marketing_requests"); // Filter by approval_type=TTS
           const data = await response.json();
 
-          console.log("Approvals Data:", data);
 
           if (data && data.length > 0) {
             approvalsContainer.innerHTML = "";

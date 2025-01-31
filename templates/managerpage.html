@@ -46,7 +46,6 @@
           ); // Filter by approval_type=COGS
           const data = await response.json();
 
-          console.log("Approvals Data:", data);
 
           if (data && data.length > 0) {
             approvalsContainer.innerHTML = "";
